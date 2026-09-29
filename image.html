@@ -193,6 +193,7 @@
     .btn-clear { background: #e53e3e; color: white; }
     .btn-dl { background: #3182ce; color: white; }
     .btn-ul { background: #d69e2e; color: white; }
+    .btn-sketch { background: #805ad5; color: white; }
     .btn-add-color {
       background: #38a169;
       color: white;
@@ -204,16 +205,41 @@
       font-weight: bold;
     }
 
+    /* 下絵を重ねるためのコンテナ */
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      max-width: 320px;
+      aspect-ratio: 1;
+    }
+
+    .sketch-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.4;
+      pointer-events: none;
+      border-radius: 4px;
+    }
+
     .pixel-grid {
+      position: absolute;
+      top: 0;
+      left: 0;
       display: grid;
       gap: 1px;
-      background: #cbd5e0;
+      background: rgba(205, 213, 224, 0.7);
       border: 2px solid #a0aec0;
       padding: 2px;
       border-radius: 4px;
       width: 100%;
-      max-width: 320px;
-      aspect-ratio: 1;
+      height: 100%;
+      box-sizing: border-box;
     }
 
     .pixel-cell {
@@ -222,10 +248,10 @@
       border-radius: 1px;
       transition: background 0.1s;
       border: 1px solid rgba(0,0,0,0.05);
-      background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+      background-image: linear-gradient(45deg, rgba(226,232,240,0.5) 25%, transparent 25%), linear-gradient(-45deg, rgba(226,232,240,0.5) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(226,232,240,0.5) 75%), linear-gradient(-45deg, transparent 75%, rgba(226,232,240,0.5) 75%);
       background-size: 8px 8px;
       background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
-      background-color: #ffffff;
+      background-color: rgba(255,255,255,0.85);
     }
     
     .palette-box {
@@ -428,6 +454,24 @@
             </div>
           </div>
 
+          <!-- 下絵コントロールエリアを追加 -->
+          <div style="background:#edf2f7; border:1px solid #cbd5e0; padding:8px 12px; border-radius:6px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div style="font-size:0.8rem; font-weight:bold; color:#2d3748;">
+              🖼️ 下絵（標本化・量子化の参考）
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button class="btn-action btn-sketch" style="padding:3px 8px; font-size:0.75rem;" onclick="document.getElementById('sketch-input').click()">📁 下絵読込</button>
+              <button class="btn-action" style="padding:3px 8px; font-size:0.75rem; background:#2b6cb0; color:white;" onclick="autoQuantizeSketch()">⚡ 自動標本化・量子化</button>
+              <button class="btn-action btn-clear" style="padding:3px 8px; font-size:0.75rem;" onclick="clearSketch()">✕下絵消去</button>
+              <input type="file" id="sketch-input" style="display:none;" accept="image/*" onchange="loadSketch(event)">
+            </div>
+          </div>
+          <div id="sketch-controls" style="display:none; margin-bottom:10px; font-size:0.8rem; background:#fff; padding:6px 10px; border:1px solid #cbd5e0; border-radius:4px; align-items:center; gap:10px;">
+            <span>下絵の濃さ:</span>
+            <input type="range" id="sketch-opacity" min="0.1" max="1.0" step="0.1" value="0.4" style="flex-grow:1; cursor:pointer;" oninput="updateSketchOpacity(this.value)">
+            <span id="sketch-opacity-val" style="font-family:monospace; width:30px;">0.4</span>
+          </div>
+
           <div style="background:#e2e8f0; padding:10px; border-radius:6px; margin-bottom:12px;">
             <div style="font-size:0.8rem; font-weight:bold; color:#2d3748; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
               <span>🎬 フレーム (<span id="current-frame-label">1</span> / <span id="total-frames-label">1</span>枚目)</span>
@@ -438,7 +482,7 @@
             </div>
             <div class="anim-tools">
               <button class="btn-action" style="background:#4a5568; color:white; font-size:0.75rem;" onclick="switchFrame(-1)">◀ 前へ</button>
-              <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(0, -1)">⬆️ 上</button>
+              <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(0, -1)">⬆️️ 上</button>
               <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(0, 1)">⬇️ 下</button>
               <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(-1, 0)">⬅️ 左</button>
               <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(1, 0)">➡️ 右</button>
@@ -472,7 +516,11 @@
         </div>
 
         <div class="visual-box">
-          <div id="img-visual" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;"></div>
+          <!-- 下絵とピクセルグリッドを重ねるコンテナ -->
+          <div class="canvas-container">
+            <div id="sketch-bg" class="sketch-background" style="display: none;"></div>
+            <div id="img-visual" style="width:100%; height:100%;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -486,6 +534,9 @@
     let selectedRIndex = 0;
     let selectedGIndex = 0;
     let selectedBIndex = 0;
+
+    // グローバルに下絵のImageオブジェクトを保持する変数
+    let loadedSketchImage = null;
 
     let editablePalettes = {
       '1': ['#ffffff', '#1a365d'],
@@ -505,6 +556,117 @@
       '24': ['#ffffff', '#000000', '#e53e3e', '#38a169', '#3182ce', '#d69e2e', '#805ad5', '#718096', '#ff69b4', '#00ffff'],
       'rgb-custom': ['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff']
     };
+
+    // --- 下絵機能のスクリプト ---
+    function loadSketch(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      let reader = new FileReader();
+      reader.onload = function(e) {
+        let bg = document.getElementById('sketch-bg');
+        bg.style.backgroundImage = `url('${e.target.result}')`;
+        bg.style.display = 'block';
+        document.getElementById('sketch-controls').style.display = 'flex';
+
+        // 自動変換用にImageオブジェクトとしても保持しておく
+        loadedSketchImage = new Image();
+        loadedSketchImage.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      event.target.value = '';
+    }
+
+    function clearSketch() {
+      let bg = document.getElementById('sketch-bg');
+      bg.style.backgroundImage = 'none';
+      bg.style.display = 'none';
+      document.getElementById('sketch-controls').style.display = 'none';
+      loadedSketchImage = null;
+    }
+
+    function updateSketchOpacity(val) {
+      document.getElementById('sketch-bg').style.opacity = val;
+      document.getElementById('sketch-opacity-val').textContent = val;
+    }
+    // ----------------------------
+
+    // --- 自動標本化・量子化機能の追加 ---
+    function autoQuantizeSketch() {
+      if (!loadedSketchImage) {
+        alert("先に「📁 下絵読込」から画像を読み込んでください。");
+        return;
+      }
+
+      const grid = parseInt(document.getElementById('img-grid-size').value);
+      const palette = getActivePalette();
+
+      // 一時的なCanvasを作成して下絵を描画し、各グリッドの中心の色をサンプリングする
+      const canvas = document.createElement('canvas');
+      canvas.width = grid;
+      canvas.height = grid;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(loadedSketchImage, 0, 0, grid, grid);
+
+      const imgData = ctx.getImageData(0, 0, grid, grid).data;
+      let frame = frames[currentFrameIndex];
+      frame.grid = grid;
+      frame.offsetX = 0;
+      frame.offsetY = 0;
+      frame.data = new Array(grid * grid);
+
+      for (let y = 0; y < grid; y++) {
+        for (let x = 0; x < grid; x++) {
+          let i = (y * grid + x) * 4;
+          let r = imgData[i];
+          let g = imgData[i + 1];
+          let b = imgData[i + 2];
+          let a = imgData[i + 3];
+
+          // 完全な透明（アルファが低い場合）は未選択(-1)にする
+          if (a < 50) {
+            frame.data[y * grid + x] = -1;
+            continue;
+          }
+
+          // 量子化：現在のパレットの中からユークリッド距離が最も近い色を自動選択する
+          let closestIndex = 0;
+          let minDistance = Infinity;
+
+          palette.forEach((colStr, pIdx) => {
+            let rgb = parseColorString(colStr);
+            let dist = Math.pow(r - rgb.r, 2) + Math.pow(g - rgb.g, 2) + Math.pow(b - rgb.b, 2);
+            if (dist < minDistance) {
+              minDistance = dist;
+              closestIndex = pIdx;
+            }
+          });
+
+          frame.data[y * grid + x] = closestIndex;
+        }
+      }
+
+      renderPixelGrid();
+      calculate();
+    }
+
+    // カラー文字列（#hex または rgb(r,g,b)）を数値オブジェクトに変換する補助関数
+    function parseColorString(str) {
+      if (str.startsWith('#')) {
+        let hex = str.replace('#', '');
+        if (hex.length === 3) {
+          hex = hex.split('').map(c => c + c).join('');
+        }
+        let num = parseInt(hex, 16);
+        return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+      } else {
+        let match = str.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (match) {
+          return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]) };
+        }
+      }
+      return { r: 0, g: 0, b: 0 };
+    }
+    // ------------------------------------
 
     function toggleRgbPanel() {
       const mode = document.getElementById('img-color-mode').value;
