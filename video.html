@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>動画データ量計算＆動画作成</title>
+  <!-- GIFアニメーション生成用の外部ライブラリ (gifshot) -->
+  <script src="https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    body { background: #f8fafc; color: #1e293b; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+    /* サイドタブメニュー */
+    .sidebar { width: 240px; background: #1a365d; color: white; display: flex; flex-direction: column; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); flex-shrink: 0; }
+    .sidebar h2 { font-size: 1.2rem; margin-bottom: 30px; text-align: center; color: #63b3ed; }
+    .tab-link { display: block; padding: 12px 15px; margin-bottom: 10px; color: #cbd5e0; text-decoration: none; font-weight: bold; border-radius: 6px; transition: 0.2s; }
+    .tab-link:hover, .tab-link.active { background: #3182ce; color: white; }
+
+    /* メインエリア */
+    .main-content { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+    h1 { font-size: 1.5rem; color: #0f172a; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* 既存の機能用スタイルを統合 */
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e2e8f0; }
+    .input-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+    label { font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 5px; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px; box-sizing: border-box; font-size: 0.95rem; }
+    .grid-2col { display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; }
+    @media (max-width: 960px) { .grid-2col { grid-template-columns: 1fr; } }
+    .visual-box { background: #edf2f7; border: 2px dashed #cbd5e0; border-radius: 6px; padding: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 580px; box-sizing: border-box; }
+    .result-box { background: #2d3748; color: #fff; padding: 16px; border-radius: 6px; }
+    .result-title { font-weight: bold; color: #63b3ed; margin-bottom: 6px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+    .result-rule { font-size: 0.7rem; color: #f6ad55; font-weight: normal; background: #1a202c; padding: 2px 6px; border-radius: 3px; }
+    .result-value { font-size: 1.4rem; font-weight: bold; color: #48bb78; font-family: monospace; margin-bottom: 10px; }
+    .calc-formula { font-family: monospace; font-size: 0.82rem; color: #e2e8f0; line-height: 1.6; background: #1a202c; padding: 10px; border-radius: 4px; }
+    .calc-formula span { color: #f6ad55; font-weight: bold; }
+    .timeline-container { display: flex; gap: 8px; overflow-x: auto; padding: 8px; background: #e2e8f0; border-radius: 6px; margin-bottom: 15px; min-height: 80px; align-items: center; }
+    .timeline-thumb { position: relative; width: 54px; height: 54px; background: white; border: 2px solid #cbd5e0; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: grab; }
+    .timeline-thumb img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+    .timeline-thumb .thumb-num { position: absolute; top: 2px; left: 2px; background: rgba(0,0,0,0.6); color: white; font-size: 0.65rem; padding: 1px 3px; border-radius: 2px; }
+    .timeline-thumb .thumb-del { position: absolute; top: 2px; right: 2px; background: #e53e3e; color: white; font-size: 0.6rem; border: none; border-radius: 50%; width: 14px; height: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .timeline-thumb .thumb-controls { position: absolute; bottom: 0; width: 100%; display: flex; background: rgba(0,0,0,0.7); justify-content: space-around; }
+    .timeline-thumb .thumb-controls button { background: none; border: none; color: white; font-size: 0.7rem; cursor: pointer; padding: 1px; }
+    .meta-badge { background: #3182ce; color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px; display: inline-block; font-weight: bold; }
+    .download-panel { background: #fff; border: 1px solid #cbd5e0; padding: 12px; border-radius: 6px; margin-top: 10px; width: 100%; box-sizing: border-box; }
+    .download-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+    @media (max-width: 600px) { .download-row { grid-template-columns: 1fr; } }
+    .download-btn { background-color: #3182ce; color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; font-size: 0.95rem; transition: background 0.2s; }
+    .download-btn:hover { background-color: #2b6cb0; }
+    .download-btn:disabled { background-color: #cbd5e0; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <!-- 左側サイドタブメニュー -->
+  <nav class="sidebar">
+    <h2>📊 MM情報1</h2>
+    <a href="index.html" class="tab-link">🏠 ホーム</a>
+    <a href="text.html" class="tab-link">📝 文字データ量計算</a>
+    <a href="mojibake.html" class="tab-link">🔤 文字化け実験室</a>
+    <a href="audio.html" class="tab-link">🎵 音声データ量計算</a>
+    <a href="image.html" class="tab-link">🖼️ 画像データ量計算</a>
+    <a href="video.html" class="tab-link active">🎬 動画データ量計算</a>
+    <a href="rogic_circuit.html" class="tab-link">⚡ 論理回路シミュレーター</a>
+  </nav>
+
+  <!-- メインコンテンツ -->
+  <div class="main-content">
+    <h1>🎬 動画データ量計算＆動画作成</h1>
+
+    <div class="card">
+      <div class="grid-2col">
+        <div>
+          <div class="input-group">
+            <div>
+              <label>📁 画像を追加アップロード</label>
+              <input type="file" id="video-file-input" multiple accept="image/*" onchange="handleImageUpload(event)" style="padding: 6px; font-size: 0.85rem;">
+            </div>
+            <div>
+              <label>解像度（ピクセルサイズ）</label>
+              <select id="video-res" onchange="handleResChange()">
+                <option value="dot" selected>アップロード画像のサイズ（等倍）</option>
+                <option value="320x320">LINEスタンプ向け (320 × 320 px)</option>
+                <option value="640x480">SD (640 × 480 px)</option>
+                <option value="1280x720">HD (1280 × 720 px)</option>
+                <option value="1920x1080">Full HD (1920 × 1080 px)</option>
+              </select>
+            </div>
+            <div>
+              <label>画素あたりの情報量 (色数)</label>
+              <select id="video-bpp" onchange="calculate()">
+                <option value="1">1 bit/px (2色)</option>
+                <option value="2">2 bit/px (4色)</option>
+                <option value="4">4 bit/px (16色)</option>
+                <option value="8">8 bit/px (256色)</option>
+                <option value="24">24 bit/px (フルカラー)</option>
+                <option value="custom" selected>画像メタデータから自動継承</option>
+              </select>
+            </div>
+            <div>
+              <label>フレームレート (fps)</label>
+              <select id="video-fps" onchange="calculate()">
+                <option value="1">1 fps (1秒に1枚)</option>
+                <option value="5" selected>5 fps (パラパラ漫画)</option>
+                <option value="30">30 fps (標準動画)</option>
+              </select>
+            </div>
+            <div>
+              <label>動画の再生時間 (秒)</label>
+              <input type="number" id="video-duration" value="3" min="1" max="60" onchange="calculate()" style="padding: 8px;">
+            </div>
+          </div>
+
+          <div id="meta-status-container"></div>
+
+          <label>🎬 登録された素材フレーム（◀ ▶ で順番変更、✕ で削除）</label>
+          <div id="timeline-container" class="timeline-container">
+            <span style="font-size:0.8rem; color:#718096; width:100%; text-align:center;">画像がアップロードされていません</span>
+          </div>
+
+          <div class="result-box">
+            <div class="result-title">
+              <span>【計算結果】動画データ量 (非圧縮) の詳細内訳</span>
+              <span class="result-rule">※ 1KB=1,000B, 1MB=1,000KB で計算</span>
+            </div>
+            <div class="result-value" id="video-result">-</div>
+            <div class="calc-formula" id="video-formula"></div>
+          </div>
+        </div>
+        
+        <div class="visual-box">
+          <div id="video-visual" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; flex-grow: 1;">
+            <div style="font-weight:bold; color:#718096; text-align:center; padding: 20px;">
+              📁 左上の「画像を追加アップロード」から、<br>画像ファイルを選択してください！
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let rawUploadedFiles = []; 
+    let uploadedImages = [];   
+    let loadedFrameMetas = []; 
+    let animPreviewTimer = null;
+    let isRecording = false;
+
+    function formatBytes(bytes) {
+      if (bytes < 1000) return bytes + " Byte (" + (bytes * 8).toLocaleString() + " bit)";
+      const kb = bytes / 1000;
+      if (kb < 1000) return kb.toFixed(2) + " KB (" + bytes.toLocaleString() + " Byte)";
+      const mb = kb / 1000;
+      if (mb < 1000) return mb.toFixed(2) + " MB (" + Math.round(bytes).toLocaleString() + " Byte)";
+      return (mb / 1000).toFixed(2) + " GB";
+    }
+
+    function handleResChange() {
+      if (rawUploadedFiles.length === 0) {
+        calculate();
+        return;
+      }
+      processAndReloadImages(rawUploadedFiles);
+    }
+
+    function handleImageUpload(event) {
+      const files = Array.from(event.target.files);
+      if (files.length === 0) return;
+
+      files.sort((a, b) => a.name.localeCompare(b.name, 'ja', { numeric: true }));
+      rawUploadedFiles = rawUploadedFiles.concat(files);
+      processAndReloadImages(rawUploadedFiles);
+      event.target.value = '';
+    }
+
+    function extractPngMetadata(buffer, targetKey) {
+      let view = new DataView(buffer);
+      let bytes = new Uint8Array(buffer);
+      let offset = 8;
+
+      while (offset < bytes.length) {
+        let length = view.getUint32(offset);
+        let type = String.fromCharCode(bytes[offset+4], bytes[offset+5], bytes[offset+6], bytes[offset+7]);
+        
+        if (type === 'tEXt') {
+          let dataBytes = bytes.subarray(offset + 8, offset + 8 + length);
+          let nullIdx = dataBytes.indexOf(0);
+          let key = new TextDecoder().decode(dataBytes.subarray(0, nullIdx));
+          if (key === targetKey) {
+            let val = new TextDecoder().decode(dataBytes.subarray(nullIdx + 1));
+            return val;
+          }
+        }
+        offset += 12 + length;
+      }
+      return null;
+    }
+
+    function getBits(grad) { return Math.round(Math.log2(grad)); }
+
+    function processAndReloadImages(files) {
+      uploadedImages = [];
+      loadedFrameMetas = [];
+      const resType = document.getElementById('video-res').value;
+
+      let targetW = null, targetH = null;
+      if (resType === '320x320') { targetW = 320; targetH = 320; }
+      else if (resType === '640x480') { targetW = 640; targetH = 480; }
+      else if (resType === '1280x720') { targetW = 1280; targetH = 720; }
+      else if (resType === '1920x1080') { targetW = 1920; targetH = 1080; }
+
+      let processedCount = 0;
+      files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const buffer = e.target.result;
+          const metaStr = extractPngMetadata(buffer, "DotAppMeta");
+          let metaObj = null;
+          if (metaStr) {
+            try { metaObj = JSON.parse(metaStr); } catch(err) { console.error(err); }
+          }
+          loadedFrameMetas[index] = metaObj;
+
+          const blob = new Blob([buffer], { type: "image/png" });
+          const imgUrl = URL.createObjectURL(blob);
+
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let w = targetW;
+            let h = targetH;
+
+            if (w === null || h === null) {
+              if (metaObj && metaObj.gridSize) {
+                w = metaObj.gridSize;
+                h = metaObj.gridSize;
+              } else {
+                w = img.width;
+                h = img.height;
+              }
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, 0, w, h);
+
+            uploadedImages[index] = canvas.toDataURL('image/png');
+            processedCount++;
+
+            if (processedCount === files.length) {
+              updateMetaStatusDisplay();
+              updateTimeline();
+              calculate();
+              startVideoPreview();
+            }
+          };
+          img.src = imgUrl;
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function updateMetaStatusDisplay() {
+      const container = document.getElementById('meta-status-container');
+      const validMetas = loadedFrameMetas.filter(m => m !== null);
+      if (validMetas.length > 0) {
+        container.innerHTML = `<div class="meta-badge">🔗 画像作成ツールのメタデータを正常に引き継ぎました（${validMetas.length}/${loadedFrameMetas.length}枚）</div>`;
+      } else {
+        container.innerHTML = ``;
+      }
+    }
+
+    function updateTimeline() {
+      const container = document.getElementById('timeline-container');
+      if (uploadedImages.length === 0) {
+        container.innerHTML = `<span style="font-size:0.8rem; color:#718096; width:100%; text-align:center;">画像がアップロードされていません</span>`;
+        return;
+      }
+
+      let html = '';
+      uploadedImages.forEach((src, idx) => {
+        html += `
+          <div class="timeline-thumb">
+            <span class="thumb-num">${idx + 1}</span>
+            <button class="thumb-del" onclick="removeUploadedImage(${idx})" title="削除">×</button>
+            <img src="${src}" alt="フレーム${idx+1}">
+            <div class="timeline-controls">
+              <button onclick="moveUploadedImage(${idx}, -1)" ${idx === 0 ? 'style="opacity:0.3; pointer-events:none;"' : ''}>◀</button>
+              <button onclick="moveUploadedImage(${idx}, 1)" ${idx === uploadedImages.length - 1 ? 'style="opacity:0.3; pointer-events:none;"' : ''}>▶</button>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function removeUploadedImage(index) {
+      rawUploadedFiles.splice(index, 1);
+      uploadedImages.splice(index, 1);
+      loadedFrameMetas.splice(index, 1);
+      updateMetaStatusDisplay();
+      updateTimeline();
+      calculate();
+      startVideoPreview();
+    }
+
+    function moveUploadedImage(index, direction) {
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= uploadedImages.length) return;
+      
+      const tempFile = rawUploadedFiles[index];
+      rawUploadedFiles[index] = rawUploadedFiles[newIndex];
+      rawUploadedFiles[newIndex] = tempFile;
+
+      const tempImg = uploadedImages[index];
+      uploadedImages[index] = uploadedImages[newIndex];
+      uploadedImages[newIndex] = tempImg;
+
+      const tempMeta = loadedFrameMetas[index];
+      loadedFrameMetas[index] = loadedFrameMetas[newIndex];
+      loadedFrameMetas[newIndex] = tempMeta;
+
+      updateTimeline();
+      calculate();
+      startVideoPreview();
+    }
+
+    function calculate() {
+      const fps = parseInt(document.getElementById('video-fps').value);
+      const durationSec = parseFloat(document.getElementById('video-duration').value) || 1;
+      const totalFrames = Math.round(fps * durationSec);
+
+      const resType = document.getElementById('video-res').value;
+      const bppSelectVal = document.getElementById('video-bpp').value;
+
+      let w = 8, h = 8; 
+      if (resType === '320x320') { w = 320; h = 320; }
+      else if (resType === '640x480') { w = 640; h = 480; }
+      else if (resType === '1280x720') { w = 1280; h = 720; }
+      else if (resType === '1920x1080') { w = 1920; h = 1080; }
+      else if (resType === 'dot' && uploadedImages.length > 0) {
+        if (loadedFrameMetas[0] && loadedFrameMetas[0].gridSize) {
+          w = loadedFrameMetas[0].gridSize;
+          h = loadedFrameMetas[0].gridSize;
+        } else {
+          const tempImgObj = new Image();
+          tempImgObj.src = uploadedImages[0];
+          w = tempImgObj.width || 8;
+          h = tempImgObj.height || 8;
+        }
+      }
+
+      let bpp = 2; 
+      let bppSourceDesc = "";
+      if (bppSelectVal === 'custom' && loadedFrameMetas[0]) {
+        let meta = loadedFrameMetas[0];
+        if (meta.colorMode === 'rgb-custom') {
+          let rBits = getBits(parseInt(meta.rGrad));
+          let gBits = getBits(parseInt(meta.gGrad));
+          let bBits = getBits(parseInt(meta.bGrad));
+          bpp = rBits + gBits + bBits;
+          bppSourceDesc = `画像メタデータより自動継承 (RGB個別階調: R${meta.rGrad}×G${meta.gGrad}×B${meta.bGrad} ➔ ${bpp} bit/px)`;
+        } else if (meta.colorMode) {
+          bpp = (meta.colorMode === '8') ? 8 : parseInt(meta.colorMode);
+          bppSourceDesc = `画像メタデータより自動継承 (${bpp} bit/px)`;
+        }
+      } else {
+        bpp = parseInt(bppSelectVal);
+        bppSourceDesc = `手動選択 (${bpp} bit/px)`;
+      }
+
+      const totalPixelsPerFrame = w * h;
+      const frameBits = totalPixelsPerFrame * bpp;
+      const frameBytes = frameBits / 8;
+      const totalBits = frameBits * totalFrames;
+      const totalBytes = totalBits / 8;
+
+      document.getElementById('video-result').textContent = formatBytes(totalBytes);
+      document.getElementById('video-formula').innerHTML = 
+        `① 1フレームの解像度 = ${w} × ${h} = <span>${totalPixelsPerFrame.toLocaleString()} px</span><br>` +
+        `② 画素あたりの情報量 = <span>${bpp} bit/px</span> (${bppSourceDesc})<br>` +
+        `③ 1フレームあたりの容量 = ${totalPixelsPerFrame.toLocaleString()} × ${bpp} = <span>${frameBits.toLocaleString()} bit</span> (${frameBytes.toLocaleString()} Byte)<br>` +
+        `④ 総フレーム数 = フレームレート (${fps} fps) × 再生時間 (${durationSec}秒) = <span>${totalFrames.toLocaleString()} 枚</span><br>` +
+        `⑤ 動画総容量 = ${frameBytes.toLocaleString()} Byte × ${totalFrames.toLocaleString()}枚 = <span>${totalBytes.toLocaleString()} Byte</span>`;
+
+      if (uploadedImages.length === 0) {
+        document.getElementById('video-visual').innerHTML = `
+          <div style="font-weight:bold; color:#718096; text-align:center; padding: 20px;">
+            📁 左上の「画像を追加アップロード」から、<br>画像ファイルを選択してください！
+          </div>
+        `;
+      } else {
+        document.getElementById('video-visual').innerHTML = `
+          <div style="font-weight:bold; color:#2d3748; margin-bottom:12px; text-align:center; font-size: 1rem;">🎬 パラパラ漫画アニメーション再生</div>
+          <div id="anim-preview-box" style="width: 100%; max-width: 420px; aspect-ratio: 1; border:3px solid #3182ce; background:#fff; display:flex; align-items:center; justify-content:center; border-radius:8px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); image-rendering:pixelated; overflow:hidden;"></div>
+          <div style="margin-top:10px; font-size:0.85rem; color:#4a5568; font-weight:bold;">素材画像数: ${uploadedImages.length}枚 / 総フレーム数: ${totalFrames}枚 (${fps} fps × ${durationSec}秒)</div>
+          
+          <div class="download-panel">
+            <div class="download-row">
+              <div>
+                <label for="download-res-select" style="margin-bottom: 4px; color: #2d3748;">📥 ダウンロードサイズ:</label>
+                <select id="download-res-select" style="margin-bottom: 6px;">
+                  <option value="240x240">LINEスタンプ・小 (240 × 240 px)</option>
+                  <option value="320x320">LINEスタンプ・標準 (320 × 320 px)</option>
+                  <option value="dot" selected>プレビュー解像度（等倍）</option>
+                  <option value="640x480">SD (640 × 480 px)</option>
+                  <option value="1280x720">HD (1280 × 720 px)</option>
+                </select>
+              </div>
+              <div>
+                <label for="download-bg-select" style="margin-bottom: 4px; color: #2d3748;">🎨 背景の透過設定:</label>
+                <select id="download-bg-select" style="margin-bottom: 6px;">
+                  <option value="opaque" selected>白背景（不透明）</option>
+                  <option value="transparent">背景を透明にする (透過GIF対応)</option>
+                </select>
+              </div>
+            </div>
+            <div class="download-row">
+              <button id="download-webm-btn" class="download-btn" onclick="downloadVideoWebM()">📥 動画でダウンロード (WebM)</button>
+              <button id="download-gif-btn" class="download-btn" style="background-color: #38a169;" onclick="downloadVideoGIF()">🎨 GIFアニメでダウンロード</button>
+            </div>
+          </div>
+        `;
+        startVideoPreview();
+      }
+    }
+
+    function startVideoPreview() {
+      clearInterval(animPreviewTimer);
+      if (uploadedImages.length === 0 || isRecording) return;
+      
+      const fpsSelect = document.getElementById('video-fps');
+      const fps = fpsSelect ? parseInt(fpsSelect.value) : 5;
+      const intervalMs = Math.max(50, 1000 / fps);
+
+      let idx = 0;
+      const box = document.getElementById('anim-preview-box');
+      if (!box) return;
+
+      animPreviewTimer = setInterval(() => {
+        let imgSrc = uploadedImages[idx % uploadedImages.length];
+        box.innerHTML = `<img src="${imgSrc}" style="width:100%; height:100%; image-rendering: pixelated; object-fit: contain;">`;
+        idx++;
+      }, intervalMs);
+    }
+
+    function getTargetDimensions() {
+      const downloadResType = document.getElementById('download-res-select').value;
+      const mainResType = document.getElementById('video-res').value;
+
+      let w = 400, h = 400;
+      if (downloadResType === '240x240') { w = 240; h = 240; }
+      else if (downloadResType === '320x320') { w = 320; h = 320; }
+      else if (downloadResType === '640x480') { w = 640; h = 480; }
+      else if (downloadResType === '1280x720') { w = 1280; h = 720; }
+      else if (downloadResType === '1920x1080') { w = 1920; h = 1080; }
+      else {
+        if (mainResType === '320x320') { w = 320; h = 320; }
+        else if (mainResType === '640x480') { w = 640; h = 480; }
+        else if (mainResType === '1280x720') { w = 1280; h = 720; }
+        else if (mainResType === '1920x1080') { w = 1920; h = 1080; }
+        else {
+          if (loadedFrameMetas[0] && loadedFrameMetas[0].gridSize) {
+            w = loadedFrameMetas[0].gridSize;
+            h = loadedFrameMetas[0].gridSize;
+          } else {
+            const tempImgObj = new Image();
+            tempImgObj.src = uploadedImages[0];
+            w = tempImgObj.width || 32;
+            h = tempImgObj.height || 32;
+          }
+        }
+      }
+      return { w, h };
+    }
+
+    function downloadVideoWebM() {
+      if (uploadedImages.length === 0 || isRecording) return;
+      isRecording = true;
+      clearInterval(animPreviewTimer);
+
+      const btnWebm = document.getElementById('download-webm-btn');
+      const btnGif = document.getElementById('download-gif-btn');
+      btnWebm.textContent = "⏳ 録画・エンコード中...";
+      btnWebm.disabled = true;
+      btnGif.disabled = true;
+
+      const fps = parseInt(document.getElementById('video-fps').value);
+      const durationSec = parseFloat(document.getElementById('video-duration').value) || 3;
+      const totalFramesToRecord = Math.round(fps * durationSec);
+      const bgSetting = document.getElementById('download-bg-select').value;
+
+      const { w, h } = getTargetDimensions();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      const box = document.getElementById('anim-preview-box');
+      if (box) {
+        box.innerHTML = '';
+        box.appendChild(canvas);
+      }
+
+      const stream = canvas.captureStream(fps);
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+      } catch (e) {
+        try {
+          recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        } catch (err) {
+          alert("お使いのブラウザは動画の録画機能（MediaRecorder）に対応していません。");
+          isRecording = false;
+          btnWebm.textContent = "📥 動画でダウンロード (WebM)";
+          btnWebm.disabled = false;
+          btnGif.disabled = false;
+          startVideoPreview();
+          return;
+        }
+      }
+
+      let chunks = [];
+      recorder.ondataavailable = function(e) {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = function() {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pixel_animation_${w}x${h}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        isRecording = false;
+        btnWebm.textContent = "📥 動画でダウンロード (WebM)";
+        btnWebm.disabled = false;
+        btnGif.disabled = false;
+        startVideoPreview();
+      };
+
+      recorder.start();
+
+      let currentFrame = 0;
+      const intervalMs = 1000 / fps;
+
+      const recordTimer = setInterval(() => {
+        if (currentFrame >= totalFramesToRecord) {
+          clearInterval(recordTimer);
+          recorder.stop();
+          return;
+        }
+
+        let imgSrc = uploadedImages[currentFrame % uploadedImages.length];
+        const img = new Image();
+        img.onload = function() {
+          ctx.clearRect(0, 0, w, h);
+          if (bgSetting === 'opaque') {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+          }
+          ctx.drawImage(img, 0, 0, w, h);
+        };
+        img.src = imgSrc;
+
+        currentFrame++;
+      }, intervalMs);
+    }
+
+    function downloadVideoGIF() {
+      if (uploadedImages.length === 0 || isRecording) return;
+      isRecording = true;
+      clearInterval(animPreviewTimer);
+
+      const btnWebm = document.getElementById('download-webm-btn');
+      const btnGif = document.getElementById('download-gif-btn');
+      btnGif.textContent = "⏳ GIF作成中...";
+      btnWebm.disabled = true;
+      btnGif.disabled = true;
+
+      const fps = parseInt(document.getElementById('video-fps').value);
+      const durationSec = parseFloat(document.getElementById('video-duration').value) || 3;
+      const totalFramesToRecord = Math.round(fps * durationSec);
+      const bgSetting = document.getElementById('download-bg-select').value;
+      const isTransparent = (bgSetting === 'transparent');
+
+      const { w, h } = getTargetDimensions();
+
+      let loadedCount = 0;
+      let frameImages = new Array(totalFramesToRecord);
+
+      for (let i = 0; i < totalFramesToRecord; i++) {
+        let imgSrc = uploadedImages[i % uploadedImages.length];
+        let img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function() {
+          let c = document.createElement('canvas');
+          c.width = w;
+          c.height = h;
+          let cx = c.getContext('2d');
+          cx.imageSmoothingEnabled = false;
+          
+          if (!isTransparent) {
+            cx.fillStyle = '#ffffff';
+            cx.fillRect(0, 0, w, h);
+          }
+          cx.drawImage(img, 0, 0, w, h);
+          frameImages[i] = c.toDataURL('image/png');
+          loadedCount++;
+
+          if (loadedCount === totalFramesToRecord) {
+            generateGifNow(frameImages, w, h, fps, isTransparent, btnWebm, btnGif);
+          }
+        };
+        img.onerror = function() {
+          loadedCount++;
+          if (loadedCount === totalFramesToRecord) {
+            generateGifNow(frameImages.filter(Boolean), w, h, fps, isTransparent, btnWebm, btnGif);
+          }
+        };
+        img.src = imgSrc;
+      }
+    }
+
+    function generateGifNow(frameImages, w, h, fps, isTransparent, btnWebm, btnGif) {
+      if (typeof gifshot === 'undefined') {
+        alert("GIF生成ライブラリの読み込みに失敗しました。インターネット接続をご確認ください。");
+        resetGifUI(btnWebm, btnGif);
+        return;
+      }
+
+      gifshot.createGIF({
+        images: frameImages,
+        interval: 1 / fps,
+        width: w,
+        height: h,
+        numFrames: frameImages.length,
+        transparent: isTransparent ? 'rgba(0,0,0,0)' : null,
+        sampleInterval: 10
+      }, function(obj) {
+        if (!obj.error) {
+          const gifDataUrl = obj.image;
+          const a = document.createElement('a');
+          a.href = gifDataUrl;
+          a.download = `pixel_animation_${w}x${h}.gif`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          alert("GIFの生成に失敗しました: " + (obj.errorCode || "不明なエラー"));
+        }
+        resetGifUI(btnWebm, btnGif);
+      });
+    }
+
+    function resetGifUI(btnWebm, btnGif) {
+      isRecording = false;
+      btnGif.textContent = "🎨 GIFアニメでダウンロード";
+      btnWebm.disabled = false;
+      btnGif.disabled = false;
+      startVideoPreview();
+    }
+
+    calculate();
+  </script>
+</body>
+</html>
