@@ -98,6 +98,7 @@
       <!-- コントロールパネル -->
       <div class="control-panel">
         <h3>完成品サンプル</h3>
+        <!-- パスワード認証付きの関数を呼び出し -->
         <div class="btn btn-preset" onclick="buildXORPreset()">✨ 階段スイッチ回路を作る</div>
 
         <h3>検証ツール</h3>
@@ -224,6 +225,20 @@
     }
 
     function buildXORPreset() {
+        // --- パスワード認証の追加 ---
+        const password = prompt("完成品サンプルを表示するにはパスワードを入力してください：");
+        
+        // ※ ここでパスワードを設定しています（必要に応じて変更してください）
+        const correctPassword = "admin123"; 
+
+        if (password !== correctPassword) {
+            if (password !== null) { // キャンセルボタンが押された場合以外
+                alert("パスワードが違います！");
+            }
+            return; // 処理を中断してサンプルを表示しない
+        }
+        // -------------------------
+
         clearAll();
         
         const swA  = addNode('SWITCH', 50, 80);
