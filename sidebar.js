@@ -6,6 +6,7 @@ window.addEventListener('DOMContentLoaded', () => {
     { href: "mojibake.html", text: "🔤 文字化け実験室" },
     { href: "audio.html", text: "🎵 音声データ量計算" },
     { href: "image.html", text: "🖼️ 画像データ量計算" },
+    { href: ""resolution_simulator.html", text: "🖼️ 解像度シミュレーター" },
     { href: "video.html", text: "🎬 動画データ量計算" },
     { href: "rogic_circuit.html", text: "⚡ 論理回路シミュレーター" },
     { href: "blockmelody.html", text: "🎵 電子オルゴール" }
