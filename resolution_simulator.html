@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>解像度と1インチマス目シミュレーター</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    body { background: #f8fafc; color: #1e293b; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+    /* サイドタブメニュー */
+    .sidebar { width: 240px; background: #1a365d; color: white; display: flex; flex-direction: column; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); flex-shrink: 0; }
+    .sidebar h2 { font-size: 1.2rem; margin-bottom: 30px; text-align: center; color: #63b3ed; }
+    .tab-link { display: block; padding: 12px 15px; margin-bottom: 10px; color: #cbd5e0; text-decoration: none; font-weight: bold; border-radius: 6px; transition: 0.2s; }
+    .tab-link:hover, .tab-link.active { background: #3182ce; color: white; }
+
+    /* メインエリア */
+    .main-content { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 1.5rem; color: #0f172a; margin-bottom: 20px; text-align: center; }
+    .app-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 900px; width: 100%; border: 1px solid #e2e8f0; }
+
+    /* シミュレーター固有のコントロール・UIデザイン */
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 15px;
+        background: #f1f5f9;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #cbd5e1;
+    }
+    .control-group label {
+        display: block;
+        font-weight: bold;
+        font-size: 0.95rem;
+        margin-bottom: 6px;
+        color: #334155;
+    }
+    .control-group input[type="range"] {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+        accent-color: #2563eb;
+    }
+    .control-group input[type="file"] {
+        font-size: 0.9rem;
+        padding: 5px 0;
+        width: 100%;
+        cursor: pointer;
+    }
+    .preview-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+    .canvas-frame {
+        border: 3px solid #1e293b;
+        background: #fff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        border-radius: 4px;
+        padding: 2px;
+        position: relative;
+        max-width: 100%;
+        overflow: auto;
+    }
+    canvas {
+        display: block;
+        background: #fff;
+        image-rendering: pixelated; /* ドットの輪郭をくっきり表示 */
+        image-rendering: crisp-edges;
+    }
+    /* 1インチごとの線をHTML(SVG)のオーバーレイとして画面ピクセル基準で常に一定の細さ・濃さで表示する */
+    .grid-overlay {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        pointer-events: none;
+        overflow: visible;
+    }
+    .note {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin-top: 10px;
+        text-align: center;
+        line-height: 1.5;
+    }
+    .steps-box {
+        background: #eff6ff;
+        border-left: 5px solid #2563eb;
+        padding: 20px;
+        border-radius: 0 8px 8px 0;
+        color: #1e3a8a;
+    }
+    .steps-box h3 {
+        margin-top: 0;
+        color: #1d4ed8;
+        font-size: 1.1rem;
+    }
+    .step-item {
+        margin-bottom: 10px;
+        line-height: 1.6;
+        font-size: 0.95rem;
+    }
+    .highlight {
+        font-weight: bold;
+        color: #d97706;
+    }
+  </style>
+</head>
+<body>
+
+<!-- 左側サイドタブメニュー（共通化） -->
+  <script src="sidebar.js"></script>
+
+  <!-- メインコンテンツ -->
+  <div class="main-content">
+    <h1>📐 1インチマス目付き 解像度シミュレーター</h1>
+    
+    <div class="app-card">
+      <div class="controls">
+          <div class="control-group">
+              <label for="heightCm">縦の長さ: <span id="hCmVal">5.0</span> cm</label>
+              <input type="range" id="heightCm" value="5" step="0.5" min="2" max="15">
+          </div>
+          <div class="control-group">
+              <label for="widthCm">横の長さ: <span id="wCmVal">7.5</span> cm</label>
+              <input type="range" id="widthCm" value="7.5" step="0.5" min="2" max="15">
+          </div>
+          <div class="control-group">
+              <label for="dpi">解像度 (dpi): <span id="dpiVal" class="highlight">10</span> dpi</label>
+              <input type="range" id="dpi" value="10" step="1" min="1" max="400">
+          </div>
+          <div class="control-group">
+              <label for="imageLoader">下絵画像を読み込む:</label>
+              <input type="file" id="imageLoader" accept="image/*">
+          </div>
+      </div>
+
+      <div class="preview-section">
+          <div class="canvas-frame" id="canvasFrame">
+              <canvas id="gridCanvas"></canvas>
+              <svg id="gridOverlay" class="grid-overlay"></svg>
+          </div>
+          <div class="note" id="canvasNote">※1dpiからスライダーを動かしても、1インチごとの線は常に細くクリアに表示され、中の絵柄がしっかり確認できます。</div>
+      </div>
+
+      <div class="steps-box">
+          <h3>📊 現在の計算結果</h3>
+          <div class="step-item" id="step1">1. インチ換算：...</div>
+          <div class="step-item" id="step2">2. 総ピクセル数：...</div>
+          <div class="step-item" id="step3">3. 解像度（縦×横）：...</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+    const widthCmInput = document.getElementById('widthCm');
+    const heightCmInput = document.getElementById('heightCm');
+    const dpiInput = document.getElementById('dpi');
+    const imageLoader = document.getElementById('imageLoader');
+
+    const wCmVal = document.getElementById('wCmVal');
+    const hCmVal = document.getElementById('hCmVal');
+    const dpiVal = document.getElementById('dpiVal');
+
+    const canvas = document.getElementById('gridCanvas');
+    const gridOverlay = document.getElementById('gridOverlay');
+    const ctx = canvas.getContext('2d');
+    
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
+    const canvasNote = document.getElementById('canvasNote');
+
+    const inchRatio = 2.5; // 1インチ = 2.5cm
+
+    // アップロードされた下絵を保持するImageオブジェクト
+    let uploadedImage = null;
+
+    imageLoader.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                uploadedImage = img;
+                updateVisualization();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function updateVisualization() {
+        const wCm = parseFloat(widthCmInput.value);
+        const hCm = parseFloat(heightCmInput.value);
+        const dpi = parseInt(dpiInput.value);
+
+        // ラベルの更新
+        wCmVal.textContent = wCm;
+        hCmVal.textContent = hCm;
+        dpiVal.textContent = dpi;
+
+        // インチ換算
+        const wInch = wCm / inchRatio;
+        const hInch = hCm / inchRatio;
+        
+        // ピクセル数計算
+        const wPx = Math.max(1, Math.round(wInch * dpi));
+        const hPx = Math.max(1, Math.round(hInch * dpi));
+        const totalPixels = wPx * hPx;
+
+        // 内部解像度を設定
+        canvas.width = wPx;
+        canvas.height = hPx;
+
+        // 縦横のドットが必ず正方形（縦横比1:1のセルサイズ）になるよう統一
+        const baseScale = 40; // 1cmあたりの基準ピクセル
+        const displayWidth = wCm * baseScale;
+        const cellPx = displayWidth / wPx; // 1ドットあたりの表示サイズを横基準で算出
+        const displayHeight = hPx * cellPx;   // 縦の表示サイズをドット数とセルサイズから決定
+
+        canvas.style.width = displayWidth + 'px';
+        canvas.style.height = displayHeight + 'px';
+        
+        // SVGオーバーレイのサイズも画面表示サイズに合わせる
+        gridOverlay.style.width = displayWidth + 'px';
+        gridOverlay.style.height = displayHeight + 'px';
+        gridOverlay.setAttribute('viewBox', `0 0 ${displayWidth} ${displayHeight}`);
+
+        // アンチエイリアスを無効化
+        ctx.imageSmoothingEnabled = false;
+
+        // 1. 背景の描画（下絵がある場合はアスペクト比を維持して描画、ない場合はデフォルトのグラデーション＆円）
+        if (uploadedImage) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, wPx, hPx);
+
+            const imgAspect = uploadedImage.width / uploadedImage.height;
+            const canvasAspect = wPx / hPx;
+            let drawW = wPx;
+            let drawH = hPx;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (imgAspect > canvasAspect) {
+                drawW = hPx * imgAspect;
+                offsetX = (wPx - drawW) / 2;
+            } else {
+                drawH = wPx / imgAspect;
+                offsetY = (hPx - drawH) / 2;
+            }
+            ctx.drawImage(uploadedImage, offsetX, offsetY, drawW, drawH);
+        } else {
+            const grad = ctx.createLinearGradient(0, 0, wPx, hPx);
+            grad.addColorStop(0, '#3498db');
+            grad.addColorStop(1, '#9b59b6');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, wPx, hPx);
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(wPx / 2, hPx / 2, Math.min(wPx, hPx) * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 2. 各ドット（ピクセル）の外枠を描画（解像度が低い時）
+        const thinLineWidth = 1 / cellPx;
+
+        if (dpi <= 80) {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.20)';
+            ctx.lineWidth = thinLineWidth;
+            for (let y = 0; y < hPx; y++) {
+                for (let x = 0; x < wPx; x++) {
+                    ctx.strokeRect(x, y, 1, 1);
+                }
+            }
+        }
+
+        // 3. 1インチ（dpi個のピクセルごと）の線をピクセル境界に正確に一致させてSVG描画
+        let svgContent = '';
+        const gridIntervalPx = dpi; // 1インチごとのピクセル数 = dpi
+        
+        const isWidthMultiple = (wCm % 2.5 === 0);
+        const isHeightMultiple = (hCm % 2.5 === 0);
+
+        const verticalStrokeDash = isWidthMultiple ? '' : ' stroke-dasharray="4 3"';
+        const horizontalStrokeDash = isHeightMultiple ? '' : ' stroke-dasharray="4 3"';
+
+        // 縦の1インチごとの線（横の長さに基づく）
+        for (let p = 0; p <= wPx; p += gridIntervalPx) {
+            const xPos = p * cellPx;
+            svgContent += `<line x1="${xPos}" y1="0" x2="${xPos}" y2="${displayHeight}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${verticalStrokeDash} />`;
+        }
+        if (!svgContent.includes(`x1="${displayWidth}"`)) {
+            svgContent += `<line x1="${displayWidth}" y1="0" x2="${displayWidth}" y2="${displayHeight}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${verticalStrokeDash} />`;
+        }
+
+        // 横の1インチごとの線（縦の長さに基づく）
+        for (let p = 0; p <= hPx; p += gridIntervalPx) {
+            const yPos = p * cellPx;
+            svgContent += `<line x1="0" y1="${yPos}" x2="${displayWidth}" y2="${yPos}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${horizontalStrokeDash} />`;
+        }
+        if (!svgContent.includes(`y1="${displayHeight}"`)) {
+            svgContent += `<line x1="0" y1="${displayHeight}" x2="${displayWidth}" y2="${displayHeight}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${horizontalStrokeDash} />`;
+        }
+        
+        // 外枠
+        svgContent += `<rect x="0" y="0" width="${displayWidth}" height="${displayHeight}" fill="none" stroke="#2980b9" stroke-width="1.5" />`;
+
+        gridOverlay.innerHTML = svgContent;
+
+        // テキスト更新（表示上の縦横サイズは「縦×横」の順で表記）
+        step1.innerHTML = `1. <b>インチ換算（1インチ = 2.5cm）</b>：<br>` +
+            `縦 ${hCm}cm ÷ 2.5 ＝ <span class="highlight">${hInch.toFixed(2)} インチ</span> ｜ ` +
+            `横 ${wCm}cm ÷ 2.5 ＝ <span class="highlight">${wInch.toFixed(2)} インチ</span>`;
+
+        step2.innerHTML = `2. <b>総ピクセル数（画素数）</b>：<br>` +
+            `縦 ${hInch.toFixed(2)}インチ × ${dpi}dpi ＝ ${hPx} px ｜ ` +
+            `横 ${wInch.toFixed(2)}インチ × ${dpi}dpi ＝ ${wPx} px<br>` +
+            `総ピクセル数：<span class="highlight">${totalPixels.toLocaleString()} 画素</span>`;
+
+        step3.innerHTML = `3. <b>解像度（縦×横）</b>：<br>` +
+            `<span class="highlight" style="font-size: 18px;">${hPx} px × ${wPx} px</span>`;
+        
+        canvasNote.innerHTML = `※外枠の物理サイズ（<b>縦 ${hCm}cm × 横 ${wCm}cm</b>）は一定のまま、<b>${dpi} dpi</b>に設定されています。<br>` +
+            `<span style="color: #2563eb; font-weight: bold;">横が2.5cmの倍数の時＝縦線が実線</span>、<span style="color: #2563eb; font-weight: bold;">縦が2.5cmの倍数の時＝横線が実線</span>（それ以外は破線）で表示されます！`;
+    }
+
+    widthCmInput.addEventListener('input', updateVisualization);
+    heightCmInput.addEventListener('input', updateVisualization);
+    dpiInput.addEventListener('input', updateVisualization);
+
+    // 初期実行
+    updateVisualization();
+</script>
+
+</body>
+</html>
