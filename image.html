@@ -222,7 +222,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.4;
+      opacity: 0.95;
       pointer-events: none;
       border-radius: 4px;
     }
@@ -393,6 +393,7 @@
                 <option value="8" selected>8 × 8 (64 px)</option>
                 <option value="16">16 × 16 (256 px)</option>
                 <option value="32">32 × 32 (1,024 px)</option>
+                <option value="64">64 × 64 (4,096 px)</option>
               </select>
             </div>
             <div>
@@ -455,13 +456,14 @@
             </div>
           </div>
 
-          <!-- 下絵コントロールエリアを追加 -->
+          <!-- 下絵コントロールエリア -->
           <div style="background:#edf2f7; border:1px solid #cbd5e0; padding:8px 12px; border-radius:6px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
             <div style="font-size:0.8rem; font-weight:bold; color:#2d3748;">
               🖼️ 下絵（標本化・量子化の参考）
             </div>
             <div style="display:flex; gap:6px; align-items:center;">
               <button class="btn-action btn-sketch" style="padding:3px 8px; font-size:0.75rem;" onclick="document.getElementById('sketch-input').click()">📁 下絵読込</button>
+              <button class="btn-action" style="padding:3px 8px; font-size:0.75rem; background:#dd6b20; color:white;" onclick="loadSampleSketch()">🐤 サンプル読込</button>
               <button class="btn-action" style="padding:3px 8px; font-size:0.75rem; background:#2b6cb0; color:white;" onclick="autoQuantizeSketch()">⚡ 自動標本化・量子化</button>
               <button class="btn-action btn-clear" style="padding:3px 8px; font-size:0.75rem;" onclick="clearSketch()">✕下絵消去</button>
               <input type="file" id="sketch-input" style="display:none;" accept="image/*" onchange="loadSketch(event)">
@@ -469,8 +471,8 @@
           </div>
           <div id="sketch-controls" style="display:none; margin-bottom:10px; font-size:0.8rem; background:#fff; padding:6px 10px; border:1px solid #cbd5e0; border-radius:4px; align-items:center; gap:10px;">
             <span>下絵の濃さ:</span>
-            <input type="range" id="sketch-opacity" min="0.1" max="1.0" step="0.1" value="0.4" style="flex-grow:1; cursor:pointer;" oninput="updateSketchOpacity(this.value)">
-            <span id="sketch-opacity-val" style="font-family:monospace; width:30px;">0.4</span>
+            <input type="range" id="sketch-opacity" min="0.1" max="1.0" step="0.1" value="0.95" style="flex-grow:1; cursor:pointer;" oninput="updateSketchOpacity(this.value)">
+            <span id="sketch-opacity-val" style="font-family:monospace; width:30px;">0.95</span>
           </div>
 
           <div style="background:#e2e8f0; padding:10px; border-radius:6px; margin-bottom:12px;">
@@ -483,7 +485,7 @@
             </div>
             <div class="anim-tools">
               <button class="btn-action" style="background:#4a5568; color:white; font-size:0.75rem;" onclick="switchFrame(-1)">◀ 前へ</button>
-              <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(0, -1)">⬆️️ 上</button>
+              <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(0, -1)">⬆ 上</button>
               <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(0, 1)">⬇️ 下</button>
               <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(-1, 0)">⬅️ 左</button>
               <button class="btn-action" style="background:#3182ce; color:white; font-size:0.75rem;" onclick="shiftImage(1, 0)">➡️ 右</button>
@@ -498,7 +500,7 @@
             </span>
             <div style="display:flex; gap:6px; align-items:center;">
               <button id="add-color-btn" class="btn-add-color" style="display:none;" onclick="addNewColorDynamic()">＋色を追加</button>
-              <button class="btn-action btn-clear" style="padding:4px 8px; font-size:0.75rem;" onclick="clearCurrentFrame()">🗑️ 消去</button>
+              <button class="btn-action btn-clear" style="padding:4px 8px; font-size:0.75rem;" onclick="clearCurrentFrame()">🗑️️ 消去</button>
               <button class="btn-action btn-ul" style="padding:4px 8px; font-size:0.75rem;" onclick="document.getElementById('upload-input').click()">📤 読込</button>
               <button class="btn-action btn-dl" style="padding:4px 8px; font-size:0.75rem;" onclick="downloadCurrentFrame()">📥 DL</button>
               <input type="file" id="upload-input" style="display:none;" accept="image/png" onchange="uploadAndRestoreFrame(event)">
@@ -568,6 +570,9 @@
         bg.style.backgroundImage = `url('${e.target.result}')`;
         bg.style.display = 'block';
         document.getElementById('sketch-controls').style.display = 'flex';
+        // スライダーの現在の値（初期値0.95含む）を確実に適用
+        let currentOpacity = document.getElementById('sketch-opacity').value;
+        updateSketchOpacity(currentOpacity);
 
         // 自動変換用にImageオブジェクトとしても保持しておく
         loadedSketchImage = new Image();
@@ -575,6 +580,35 @@
       };
       reader.readAsDataURL(file);
       event.target.value = '';
+    }
+
+    // ひよこサンプル画像を読み込む関数
+    function loadSampleSketch() {
+      const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+        <circle cx="250" cy="250" r="230" fill="#ff77a9" />
+        <path d="M250 100 C370 100 410 220 400 320 C390 400 320 430 250 430 C150 430 110 350 110 250 C110 160 160 100 250 100 Z" fill="#ffd700" stroke="#e6b800" stroke-width="4"/>
+        <path d="M230 100 Q250 60 270 100 Q285 75 295 95 Q275 110 265 115 Q250 105 235 115 Z" fill="#ffd700" stroke="#e6b800" stroke-width="3"/>
+        <circle cx="205" cy="235" r="12" fill="#1a1a1a" />
+        <circle cx="201" cy="231" r="4" fill="#ffffff" />
+        <circle cx="315" cy="235" r="12" fill="#1a1a1a" />
+        <circle cx="311" cy="231" r="4" fill="#ffffff" />
+        <polygon points="260,250 295,270 260,300" fill="#e67e22" stroke="#d35400" stroke-width="3" stroke-linejoin="round"/>
+        <ellipse cx="170" cy="265" rx="18" ry="12" fill="#ff99bb" opacity="0.6"/>
+        <ellipse cx="350" cy="265" rx="18" ry="12" fill="#ff99bb" opacity="0.6"/>
+        <path d="M350 320 Q370 340 350 360 Q370 380 340 390" fill="none" stroke="#e6b800" stroke-width="8" stroke-linecap="round"/>
+      </svg>`;
+
+      const encodedSvg = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+
+      let bg = document.getElementById('sketch-bg');
+      bg.style.backgroundImage = `url('${encodedSvg}')`;
+      bg.style.display = 'block';
+      document.getElementById('sketch-controls').style.display = 'flex';
+      let currentOpacity = document.getElementById('sketch-opacity').value;
+      updateSketchOpacity(currentOpacity);
+
+      loadedSketchImage = new Image();
+      loadedSketchImage.src = encodedSvg;
     }
 
     function clearSketch() {
@@ -594,7 +628,7 @@
     // --- 自動標本化・量子化機能の追加 ---
     function autoQuantizeSketch() {
       if (!loadedSketchImage) {
-        alert("先に「📁 下絵読込」から画像を読み込んでください。");
+        alert("先に「📁 下絵読込」または「🐤 サンプル読込」から画像を読み込んでください。");
         return;
       }
 
