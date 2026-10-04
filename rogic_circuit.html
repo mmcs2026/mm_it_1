@@ -3,500 +3,340 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>論理回路シミュレーター</title>
+  <title>解像度と1インチマス目シミュレーター</title>
   <style>
-    * { box-sizing: border-box; font-family: sans-serif; }
-    body { font-family: sans-serif; margin: 0; background-color: #f0f4f8; color: #333; display: flex; height: 100vh; overflow: hidden; }
-    
-    /* サイドタブメニューのスタイル */
-    .sidebar { width: 240px; background: #1a365d; color: white; display: flex; flex-direction: column; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); flex-shrink: 0; z-index: 50; }
+    * { box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    body { background: #f8fafc; color: #1e293b; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+    /* サイドタブメニュー */
+    .sidebar { width: 240px; background: #1a365d; color: white; display: flex; flex-direction: column; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); flex-shrink: 0; }
     .sidebar h2 { font-size: 1.2rem; margin-bottom: 30px; text-align: center; color: #63b3ed; }
     .tab-link { display: block; padding: 12px 15px; margin-bottom: 10px; color: #cbd5e0; text-decoration: none; font-weight: bold; border-radius: 6px; transition: 0.2s; }
     .tab-link:hover, .tab-link.active { background: #3182ce; color: white; }
 
-    /* メインコンテンツエリア */
-    .main-content { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; height: 100vh; }
-    h1 { color: #1a365d; margin: 0 0 15px 0; font-size: 1.4rem; display: flex; justify-content: space-between; align-items: center; }
-    .header-desc { font-size: 0.85rem; color: #666; font-weight: normal; }
+    /* メインエリア */
+    .main-content { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 1.5rem; color: #0f172a; margin-bottom: 20px; text-align: center; }
+    .app-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 900px; width: 100%; border: 1px solid #e2e8f0; }
 
-    /* シミュレーターレイアウト */
-    .sim-layout { display: flex; flex: 1; gap: 20px; min-height: 0; }
-    
-    .control-panel { width: 220px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-shrink: 0; }
-    .control-panel h3 { font-size: 0.9rem; margin: 10px 0 4px; color: #1a365d; border-bottom: 2px solid #f0f4f8; padding-bottom: 4px; }
-    
-    .btn { padding: 8px 12px; background: #f0f4f8; color: #333; border: 1px solid #cbd5e0; border-radius: 6px; cursor: pointer; text-align: center; font-weight: bold; font-size: 0.85rem; transition: 0.1s; }
-    .btn:hover { background: #e2e8f0; }
-    .btn-preset { background: #c6f6d5; color: #22543d; border-color: #9ae6b4; font-size: 0.9rem; padding: 10px; }
-    .btn-preset:hover { background: #9ae6b4; }
-    .btn-table { background: #ebf8ff; color: #2b6cb0; border-color: #bee3f8; font-size: 0.9rem; padding: 10px; }
-    .btn-table:hover { background: #bee3f8; }
-    .btn-danger { background: #fed7d7; color: #9b2c2c; border-color: #feb2b2; }
-    .btn-danger:hover { background: #feb2b2; }
-
-    /* ワークスペース */
-    #workspace { flex: 1; position: relative; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background-size: 20px 20px; background-image: radial-gradient(circle, #cbd5e0 1.5px, transparent 1.5px); cursor: crosshair; overflow: hidden; }
-    
-    .node { position: absolute; width: 100px; height: 60px; user-select: none; }
-    .node svg { width: 100px; height: 60px; display: block; overflow: visible; }
-    
-    .gate-shape { fill: #2d3748; stroke: #3182ce; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-    .gate-text { fill: #ffffff; font-size: 11px; font-weight: bold; text-anchor: middle; dominant-baseline: middle; }
-    
-    .pin { width: 14px; height: 14px; background: #a0aec0; border-radius: 50%; position: absolute; cursor: pointer; border: 2px solid #ffffff; transform: translate(-50%, -50%); z-index: 30; transition: transform 0.1s; }
-    .pin.active { background: #48bb78; box-shadow: 0 0 6px #48bb78; }
-    .pin:hover { border-color: #d69e2e; transform: translate(-50%, -50%) scale(1.25); }
-
-    .del-btn { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #e53e3e; color: #ffffff; border-radius: 50%; border: none; font-size: 10px; font-weight: bold; cursor: pointer; display: none; line-height: 18px; text-align: center; padding: 0; z-index: 40; }
-    .node:hover .del-btn { display: block; }
-
-    .sw-btn { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; padding: 2px 8px; background: #d69e2e; color: #ffffff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    
-    #wireLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-    .wire-path { stroke: #a0aec0; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; cursor: pointer; pointer-events: stroke; transition: stroke 0.1s; }
-    .wire-path:hover { stroke: #e53e3e !important; stroke-width: 5; }
-    .wire-path.active { stroke: #48bb78; stroke-width: 3.5; }
-
-    /* 真理表モーダル */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
-    .modal-content { background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .modal-title { font-size: 1.1rem; font-weight: bold; color: #1a365d; margin: 0; }
-    .close-btn { background: #e53e3e; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; }
-    
-    table.truth-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem; }
-    table.truth-table th, table.truth-table td { border: 1px solid #cbd5e0; padding: 8px; }
-    table.truth-table th { background: #f0f4f8; color: #333; }
-    table.truth-table th.out-header { color: #2b6cb0; background: #ebf8ff; }
-    table.truth-table td.val-1 { color: #22543d; font-weight: bold; background: #f0fff4; }
-    table.truth-table td.val-0 { color: #718096; }
+    /* シミュレーター固有のコントロール・UIデザイン */
+    .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 15px;
+        background: #f1f5f9;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #cbd5e1;
+    }
+    .control-group label {
+        display: block;
+        font-weight: bold;
+        font-size: 0.95rem;
+        margin-bottom: 6px;
+        color: #334155;
+    }
+    .control-group input[type="range"] {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+        accent-color: #2563eb;
+    }
+    .control-group input[type="file"] {
+        font-size: 0.9rem;
+        padding: 5px 0;
+        width: 100%;
+        cursor: pointer;
+    }
+    .preview-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+    .canvas-frame {
+        border: 3px solid #1e293b;
+        background: #fff;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        border-radius: 4px;
+        padding: 2px;
+        position: relative;
+        max-width: 100%;
+        overflow: auto;
+    }
+    canvas {
+        display: block;
+        background: #fff;
+        image-rendering: pixelated; /* ドットの輪郭をくっきり表示 */
+        image-rendering: crisp-edges;
+    }
+    /* 1インチごとの線をHTML(SVG)のオーバーレイとして画面ピクセル基準で常に一定の細さ・濃さで表示する */
+    .grid-overlay {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        pointer-events: none;
+        overflow: visible;
+    }
+    .note {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin-top: 10px;
+        text-align: center;
+        line-height: 1.5;
+    }
+    .steps-box {
+        background: #eff6ff;
+        border-left: 5px solid #2563eb;
+        padding: 20px;
+        border-radius: 0 8px 8px 0;
+        color: #1e3a8a;
+    }
+    .steps-box h3 {
+        margin-top: 0;
+        color: #1d4ed8;
+        font-size: 1.1rem;
+    }
+    .step-item {
+        margin-bottom: 10px;
+        line-height: 1.6;
+        font-size: 0.95rem;
+    }
+    .highlight {
+        font-weight: bold;
+        color: #d97706;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 左側サイドタブメニュー -->
-  <nav class="sidebar">
-    <h2>📊 MM情報1</h2>
-    <a href="index.html" class="tab-link">🏠 ホーム</a>
-    <a href="text.html" class="tab-link">📝 文字データ量計算</a>
-    <a href="mojibake.html" class="tab-link">🔤 文字化け実験室</a>
-    <a href="audio.html" class="tab-link">🎵 音声データ量計算</a>
-    <a href="image.html" class="tab-link">🖼️ 画像データ量計算</a>
-    <a href="video.html" class="tab-link">🎬 動画データ量計算</a>
-    <a href="rogic_circuit.html" class="tab-link active">⚡ 論理回路シミュレーター</a>
-    <a href="blockmelody.html" class="tab-link">🎵 電子オルゴール</a>
-  </nav>
+<!-- 左側サイドタブメニュー（共通化） -->
+  <script src="sidebar.js"></script>
 
   <!-- メインコンテンツ -->
   <div class="main-content">
-    <h1>
-      <span>⚡ 論理回路シミュレーター</span>
-      <span class="header-desc">💡 「階段スイッチ回路を作る」を押すと作例が自動生成されます</span>
-    </h1>
-
-    <div class="sim-layout">
-      <!-- コントロールパネル -->
-      <div class="control-panel">
-        <h3>完成品サンプル</h3>
-        <!-- パスワード認証付きの関数を呼び出し -->
-        <div class="btn btn-preset" onclick="buildXORPreset()">✨ 階段スイッチ回路を作る</div>
-
-        <h3>検証ツール</h3>
-        <div class="btn btn-table" onclick="generateTruthTable()">📊 真理表を表示</div>
-
-        <h3>パーツ手動追加</h3>
-        <div class="btn" onclick="addNode('SWITCH')">🔘 スイッチ</div>
-        <div class="btn" onclick="addNode('NOT')">⛔ NOT ゲート</div>
-        <div class="btn" onclick="addNode('AND')">🔗 AND ゲート</div>
-        <div class="btn" onclick="addNode('OR')">🔀 OR ゲート</div>
-        <div class="btn" onclick="addNode('LED')">💡 LED (出力)</div>
-        
-        <hr style="border-color: #cbd5e0; margin: 8px 0;">
-        <div class="btn btn-danger" onclick="clearAll()">🗑 全消去</div>
+    <h1>📐 1インチマス目付き 解像度シミュレーター</h1>
+    
+    <div class="app-card">
+      <div class="controls">
+          <div class="control-group">
+              <label for="heightCm">縦の長さ: <span id="hCmVal">5.0</span> cm</label>
+              <input type="range" id="heightCm" value="5" step="0.5" min="2" max="15">
+          </div>
+          <div class="control-group">
+              <label for="widthCm">横の長さ: <span id="wCmVal">7.5</span> cm</label>
+              <input type="range" id="widthCm" value="7.5" step="0.5" min="2" max="15">
+          </div>
+          <div class="control-group">
+              <label for="dpi">解像度 (dpi): <span id="dpiVal" class="highlight">10</span> dpi</label>
+              <input type="range" id="dpi" value="10" step="1" min="1" max="400">
+          </div>
+          <div class="control-group">
+              <label for="imageLoader">下絵画像を読み込む:</label>
+              <input type="file" id="imageLoader" accept="image/*">
+          </div>
       </div>
-      
-      <!-- ワークスペース -->
-      <div id="workspace">
-        <svg id="wireLayer"></svg>
+
+      <div class="preview-section">
+          <div class="canvas-frame" id="canvasFrame">
+              <canvas id="gridCanvas"></canvas>
+              <svg id="gridOverlay" class="grid-overlay"></svg>
+          </div>
+          <div class="note" id="canvasNote">※1dpiからスライダーを動かしても、1インチごとの線は常に細くクリアに表示され、中の絵柄がしっかり確認できます。</div>
+      </div>
+
+      <div class="steps-box">
+          <h3>📊 現在の計算結果</h3>
+          <div class="step-item" id="step1">1. インチ換算：...</div>
+          <div class="step-item" id="step2">2. 総ピクセル数：...</div>
+          <div class="step-item" id="step3">3. 解像度（縦×横）：...</div>
       </div>
     </div>
   </div>
 
-  <!-- 真理表モーダル -->
-  <div id="truthTableModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title">📊 回路の真理表</h3>
-        <button class="close-btn" onclick="closeModal()">✕</button>
-      </div>
-      <div id="truthTableContainer"></div>
-    </div>
-  </div>
+<script>
+    const widthCmInput = document.getElementById('widthCm');
+    const heightCmInput = document.getElementById('heightCm');
+    const dpiInput = document.getElementById('dpi');
+    const imageLoader = document.getElementById('imageLoader');
 
-  <script>
-    let nodes = [];
-    let connections = [];
-    let selectedPin = null;
+    const wCmVal = document.getElementById('wCmVal');
+    const hCmVal = document.getElementById('hCmVal');
+    const dpiVal = document.getElementById('dpiVal');
 
-    function addNode(type, customX, customY) {
-        const id = 'node_' + Date.now() + Math.floor(Math.random()*1000);
-        const workspace = document.getElementById('workspace');
-        
-        const nodeEl = document.createElement('div');
-        nodeEl.className = 'node';
-        nodeEl.id = id;
-        nodeEl.style.left = customX ? customX + 'px' : '60px';
-        nodeEl.style.top = customY ? customY + 'px' : (60 + (nodes.length % 7) * 45) + 'px';
-        
-        let svgContent = '';
-        let pinsHTML = '';
+    const canvas = document.getElementById('gridCanvas');
+    const gridOverlay = document.getElementById('gridOverlay');
+    const ctx = canvas.getContext('2d');
+    
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
+    const canvasNote = document.getElementById('canvasNote');
 
-        if (type === 'SWITCH') {
-            svgContent = `
-                <svg viewBox="0 0 100 60">
-                    <rect x="20" y="10" width="60" height="40" rx="6" class="gate-shape" style="stroke: #d69e2e;" />
-                    <text x="50" y="30" class="gate-text" id="label_${id}">OFF</text>
-                </svg>
-            `;
-            pinsHTML += `<div class="pin out-pin" data-node="${id}" data-pin="out" style="left:80px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML + `<button class="sw-btn" onclick="toggleSwitch('${id}')">切替</button>`;
-        } 
-        else if (type === 'NOT') {
-            svgContent = `
-                <svg viewBox="0 0 100 60">
-                    <path d="M 25 10 L 60 30 L 25 50 Z" class="gate-shape" />
-                    <circle cx="66" cy="30" r="4" class="gate-shape" />
-                    <line x1="10" y1="30" x2="25" y2="30" class="gate-shape" />
-                </svg>
-            `;
-            pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in1" style="left:10px; top:30px;"></div>`;
-            pinsHTML += `<div class="pin out-pin" data-node="${id}" data-pin="out" style="left:70px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML;
-        } 
-        else if (type === 'AND') {
-            svgContent = `
-                <svg viewBox="0 0 100 60">
-                    <path d="M 25 10 L 50 10 A 20 20 0 0 1 50 50 L 25 50 Z" class="gate-shape" />
-                    <line x1="10" y1="20" x2="25" y2="20" class="gate-shape" />
-                    <line x1="10" y1="40" x2="25" y2="40" class="gate-shape" />
-                    <line x1="70" y1="30" x2="80" y2="30" class="gate-shape" />
-                </svg>
-            `;
-            pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in1" style="left:10px; top:20px;"></div>`;
-            pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in2" style="left:10px; top:40px;"></div>`;
-            pinsHTML += `<div class="pin out-pin" data-node="${id}" data-pin="out" style="left:80px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML;
-        } 
-        else if (type === 'OR') {
-            svgContent = `
-                <svg viewBox="0 0 100 60">
-                    <path d="M 25 10 Q 38 30 25 50 Q 55 50 75 30 Q 55 10 25 10 Z" class="gate-shape" />
-                    <line x1="10" y1="20" x2="31" y2="20" class="gate-shape" />
-                    <line x1="10" y1="40" x2="31" y2="40" class="gate-shape" />
-                    <line x1="75" y1="30" x2="85" y2="30" class="gate-shape" />
-                </svg>
-            `;
-            pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in1" style="left:10px; top:20px;"></div>`;
-            pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in2" style="left:10px; top:40px;"></div>`;
-            pinsHTML += `<div class="pin out-pin" data-node="${id}" data-pin="out" style="left:85px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML;
-        } 
-        else if (type === 'LED') {
-            svgContent = `
-                <svg viewBox="0 0 100 60">
-                    <circle cx="45" cy="30" r="18" class="gate-shape" id="led_body_${id}" style="stroke: #e53e3e;" />
-                    <text x="45" y="30" class="gate-text" style="fill:#e53e3e;">LED</text>
-                    <line x1="10" y1="30" x2="27" y2="30" class="gate-shape" style="stroke: #e53e3e;" />
-                </svg>
-            `;
-            pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in1" style="left:10px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML;
-        }
+    const inchRatio = 2.5; // 1インチ = 2.5cm
 
-        nodeEl.innerHTML += `<button class="del-btn" onclick="removeNode('${id}')">✕</button>`;
-        workspace.appendChild(nodeEl);
-        makeDraggable(nodeEl);
-        
-        const nodeObj = { id, type, state: false, inputs: { in1: false, in2: false } };
-        nodes.push(nodeObj);
-        setupPinEvents();
-        updateLogic();
-        return nodeObj;
-    }
+    // アップロードされた下絵を保持するImageオブジェクト
+    let uploadedImage = null;
 
-    function buildXORPreset() {
-        // --- パスワード認証の追加 ---
-        const password = prompt("完成品サンプルを表示するにはパスワードを入力してください：");
-        
-        // ※ ここでパスワードを設定しています（必要に応じて変更してください）
-        const correctPassword = "admin123"; 
-
-        if (password !== correctPassword) {
-            if (password !== null) { // キャンセルボタンが押された場合以外
-                alert("パスワードが違います！");
-            }
-            return; // 処理を中断してサンプルを表示しない
-        }
-        // -------------------------
-
-        clearAll();
-        
-        const swA  = addNode('SWITCH', 50, 80);
-        const swB  = addNode('SWITCH', 50, 260);
-        
-        const notA = addNode('NOT', 200, 140);
-        const notB = addNode('NOT', 200, 200);
-        
-        const and1 = addNode('AND', 360, 90);
-        const and2 = addNode('AND', 360, 250);
-        
-        const or1  = addNode('OR',  520, 170);
-        const led  = addNode('LED', 670, 170);
-
-        connectPins(swA.id, 'out', and1.id, 'in1');
-        connectPins(swA.id, 'out', notA.id, 'in1');
-
-        connectPins(swB.id, 'out', and2.id, 'in2');
-        connectPins(swB.id, 'out', notB.id, 'in1');
-
-        connectPins(notA.id, 'out', and2.id, 'in1');
-        connectPins(notB.id, 'out', and1.id, 'in2');
-
-        connectPins(and1.id, 'out', or1.id, 'in1');
-        connectPins(and2.id, 'out', or1.id, 'in2');
-
-        connectPins(or1.id, 'out', led.id, 'in1');
-
-        updateLogic();
-    }
-
-    function connectPins(fromId, fromPin, toId, toPin) {
-        connections.push({ fromNode: fromId, fromPin, toNode: toId, toPin });
-    }
-
-    function removeNode(id) {
-        connections = connections.filter(c => c.fromNode !== id && c.toNode !== id);
-        nodes = nodes.filter(n => n.id !== id);
-        const el = document.getElementById(id);
-        if (el) el.remove();
-        updateLogic();
-    }
-
-    function removeConnection(index) {
-        connections.splice(index, 1);
-        updateLogic();
-    }
-
-    function toggleSwitch(id) {
-        const node = nodes.find(n => n.id === id);
-        node.state = !node.state;
-        const label = document.getElementById(`label_${id}`);
-        if(label) label.textContent = node.state ? 'ON' : 'OFF';
-        updateLogic();
-    }
-
-    function makeDraggable(el) {
-        let posX = 0, posY = 0, mouseX = 0, mouseY = 0;
-        el.onmousedown = function(e) {
-            if (e.target.classList.contains('pin') || e.target.tagName === 'BUTTON') return;
-            e.preventDefault();
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            document.onmouseup = closeDragElement;
-            document.onmousemove = elementDrag;
-        };
-
-        function elementDrag(e) {
-            e.preventDefault();
-            posX = mouseX - e.clientX;
-            posY = mouseY - e.clientY;
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            el.style.top = (el.offsetTop - posY) + "px";
-            el.style.left = (el.offsetLeft - posX) + "px";
-            renderWires();
-        }
-
-        function closeDragElement() {
-            document.onmouseup = null;
-            document.onmousemove = null;
-        }
-    }
-
-    function setupPinEvents() {
-        document.querySelectorAll('.pin').forEach(pin => {
-            pin.onclick = function(e) {
-                e.stopPropagation();
-                const nodeId = this.dataset.node;
-                const pinType = this.classList.contains('out-pin') ? 'out' : 'in';
-                const pinName = this.dataset.pin;
-
-                if (!selectedPin) {
-                    if (pinType === 'out') {
-                        selectedPin = { nodeId, pinName, el: this };
-                        this.style.background = '#d69e2e';
-                    }
-                } else {
-                    if (pinType === 'in' && selectedPin.nodeId !== nodeId) {
-                        connections = connections.filter(c => !(c.toNode === nodeId && c.toPin === pinName));
-                        connections.push({
-                            fromNode: selectedPin.nodeId,
-                            fromPin: selectedPin.pinName,
-                            toNode: nodeId,
-                            toPin: pinName
-                        });
-                        selectedPin.el.style.background = '#a0aec0';
-                        selectedPin = null;
-                        updateLogic();
-                    } else {
-                        selectedPin.el.style.background = '#a0aec0';
-                        selectedPin = null;
-                    }
-                }
+    imageLoader.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                uploadedImage = img;
+                updateVisualization();
             };
-        });
-    }
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
 
-    function updateLogic() {
-        nodes.forEach(n => {
-            if (n.type !== 'SWITCH') n.state = false;
-            n.inputs = { in1: false, in2: false };
-        });
+    function updateVisualization() {
+        const wCm = parseFloat(widthCmInput.value);
+        const hCm = parseFloat(heightCmInput.value);
+        const dpi = parseInt(dpiInput.value);
 
-        for (let i = 0; i < 5; i++) {
-            connections.forEach(c => {
-                const from = nodes.find(n => n.id === c.fromNode);
-                const to = nodes.find(n => n.id === c.toNode);
-                if (from && to) to.inputs[c.toPin] = from.state;
-            });
+        // ラベルの更新
+        wCmVal.textContent = wCm;
+        hCmVal.textContent = hCm;
+        dpiVal.textContent = dpi;
 
-            nodes.forEach(n => {
-                if (n.type === 'NOT') n.state = !n.inputs.in1;
-                if (n.type === 'AND') n.state = n.inputs.in1 && n.inputs.in2;
-                if (n.type === 'OR') n.state = n.inputs.in1 || n.inputs.in2;
-                if (n.type === 'LED') n.state = n.inputs.in1;
-            });
+        // インチ換算
+        const wInch = wCm / inchRatio;
+        const hInch = hCm / inchRatio;
+        
+        // ピクセル数計算
+        const wPx = Math.max(1, Math.round(wInch * dpi));
+        const hPx = Math.max(1, Math.round(hInch * dpi));
+        const totalPixels = wPx * hPx;
+
+        // 内部解像度を設定
+        canvas.width = wPx;
+        canvas.height = hPx;
+
+        // 縦横のドットが必ず正方形（縦横比1:1のセルサイズ）になるよう統一
+        const baseScale = 40; // 1cmあたりの基準ピクセル
+        const displayWidth = wCm * baseScale;
+        const cellPx = displayWidth / wPx; // 1ドットあたりの表示サイズを横基準で算出
+        const displayHeight = hPx * cellPx;   // 縦の表示サイズをドット数とセルサイズから決定
+
+        canvas.style.width = displayWidth + 'px';
+        canvas.style.height = displayHeight + 'px';
+        
+        // SVGオーバーレイのサイズも画面表示サイズに合わせる
+        gridOverlay.style.width = displayWidth + 'px';
+        gridOverlay.style.height = displayHeight + 'px';
+        gridOverlay.setAttribute('viewBox', `0 0 ${displayWidth} ${displayHeight}`);
+
+        // アンチエイリアスを無効化
+        ctx.imageSmoothingEnabled = false;
+
+        // 1. 背景の描画（下絵がある場合はアスペクト比を維持して描画、ない場合はデフォルトのグラデーション＆円）
+        if (uploadedImage) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, wPx, hPx);
+
+            const imgAspect = uploadedImage.width / uploadedImage.height;
+            const canvasAspect = wPx / hPx;
+            let drawW = wPx;
+            let drawH = hPx;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (imgAspect > canvasAspect) {
+                drawW = hPx * imgAspect;
+                offsetX = (wPx - drawW) / 2;
+            } else {
+                drawH = wPx / imgAspect;
+                offsetY = (hPx - drawH) / 2;
+            }
+            ctx.drawImage(uploadedImage, offsetX, offsetY, drawW, drawH);
+        } else {
+            const grad = ctx.createLinearGradient(0, 0, wPx, hPx);
+            grad.addColorStop(0, '#3498db');
+            grad.addColorStop(1, '#9b59b6');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, wPx, hPx);
+
+            ctx.fillStyle = '#f1c40f';
+            ctx.beginPath();
+            ctx.arc(wPx / 2, hPx / 2, Math.min(wPx, hPx) * 0.25, 0, Math.PI * 2);
+            ctx.fill();
         }
 
-        nodes.forEach(n => {
-            const el = document.getElementById(n.id);
-            if (!el) return;
-            const outPin = el.querySelector('.out-pin');
-            if (outPin) outPin.classList.toggle('active', n.state);
-            
-            if (n.type === 'LED') {
-                const ledBody = document.getElementById(`led_body_${n.id}`);
-                if (ledBody) {
-                    ledBody.style.fill = n.state ? '#48bb78' : '#2d3748';
-                    ledBody.style.stroke = n.state ? '#48bb78' : '#e53e3e';
+        // 2. 各ドット（ピクセル）の外枠を描画（解像度が低い時）
+        const thinLineWidth = 1 / cellPx;
+
+        if (dpi <= 80) {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.20)';
+            ctx.lineWidth = thinLineWidth;
+            for (let y = 0; y < hPx; y++) {
+                for (let x = 0; x < wPx; x++) {
+                    ctx.strokeRect(x, y, 1, 1);
                 }
             }
-        });
-
-        renderWires();
-    }
-
-    function renderWires() {
-        const svgArea = document.getElementById('wireLayer');
-        svgArea.innerHTML = '';
-
-        connections.forEach((c, index) => {
-            const fromPin = document.querySelector(`#${c.fromNode} .out-pin`);
-            const toPin = document.querySelector(`#${c.toNode} [data-pin="${c.toPin}"]`);
-            const fromNode = nodes.find(n => n.id === c.fromNode);
-
-            if (fromPin && toPin) {
-                const rA = fromPin.getBoundingClientRect();
-                const rB = toPin.getBoundingClientRect();
-                const wRect = document.getElementById('workspace').getBoundingClientRect();
-
-                const x1 = rA.left + rA.width/2 - wRect.left;
-                const y1 = rA.top + rA.height/2 - wRect.top;
-                const x2 = rB.left + rB.width/2 - wRect.left;
-                const y2 = rB.top + rB.height/2 - wRect.top;
-
-                const midX = x1 + (x2 - x1) / 2;
-                const d = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
-
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('d', d);
-                path.setAttribute('class', 'wire-path' + (fromNode && fromNode.state ? ' active' : ''));
-                
-                path.onclick = (e) => {
-                    e.stopPropagation();
-                    removeConnection(index);
-                };
-
-                svgArea.appendChild(path);
-            }
-        });
-    }
-
-    function clearAll() {
-        document.getElementById('workspace').innerHTML = '<svg id="wireLayer"></svg>';
-        nodes = [];
-        connections = [];
-        selectedPin = null;
-    }
-
-    function generateTruthTable() {
-        const switches = nodes.filter(n => n.type === 'SWITCH');
-        const leds = nodes.filter(n => n.type === 'LED');
-        const container = document.getElementById('truthTableContainer');
-
-        if (switches.length === 0 || leds.length === 0) {
-            container.innerHTML = '<p style="color:#e53e3e; font-size:0.9rem; text-align:center;">真理表を表示するには、少なくとも1つの「スイッチ」と1つの「LED」が必要です。</p>';
-            document.getElementById('truthTableModal').style.display = 'flex';
-            return;
         }
 
-        const originalStates = switches.map(sw => sw.state);
-        const totalCombinations = Math.pow(2, switches.length);
-        let tableHTML = '<table class="truth-table"><thead><tr>';
+        // 3. 1インチ（dpi個のピクセルごと）の線をピクセル境界に正確に一致させてSVG描画
+        let svgContent = '';
+        const gridIntervalPx = dpi; // 1インチごとのピクセル数 = dpi
+        
+        const isWidthMultiple = (wCm % 2.5 === 0);
+        const isHeightMultiple = (hCm % 2.5 === 0);
 
-        switches.forEach((sw, idx) => {
-            tableHTML += `<th>スイッチ ${String.fromCharCode(65 + idx)}</th>`;
-        });
-        leds.forEach((led, idx) => {
-            tableHTML += `<th class="out-header">LED ${idx + 1}</th>`;
-        });
-        tableHTML += '</tr></thead><tbody>';
+        const verticalStrokeDash = isWidthMultiple ? '' : ' stroke-dasharray="4 3"';
+        const horizontalStrokeDash = isHeightMultiple ? '' : ' stroke-dasharray="4 3"';
 
-        for (let i = 0; i < totalCombinations; i++) {
-            tableHTML += '<tr>';
-            
-            switches.forEach((sw, idx) => {
-                const bit = (i >> (switches.length - 1 - idx)) & 1;
-                sw.state = Boolean(bit);
-                tableHTML += `<td class="val-${bit}">${bit}</td>`;
-            });
-
-            updateLogic();
-
-            leds.forEach(led => {
-                const val = led.state ? 1 : 0;
-                tableHTML += `<td class="val-${val}">${val}</td>`;
-            });
-
-            tableHTML += '</tr>';
+        // 縦の1インチごとの線（横の長さに基づく）
+        for (let p = 0; p <= wPx; p += gridIntervalPx) {
+            const xPos = p * cellPx;
+            svgContent += `<line x1="${xPos}" y1="0" x2="${xPos}" y2="${displayHeight}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${verticalStrokeDash} />`;
+        }
+        if (!svgContent.includes(`x1="${displayWidth}"`)) {
+            svgContent += `<line x1="${displayWidth}" y1="0" x2="${displayWidth}" y2="${displayHeight}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${verticalStrokeDash} />`;
         }
 
-        tableHTML += '</tbody></table>';
-        container.innerHTML = tableHTML;
+        // 横の1インチごとの線（縦の長さに基づく）
+        for (let p = 0; p <= hPx; p += gridIntervalPx) {
+            const yPos = p * cellPx;
+            svgContent += `<line x1="0" y1="${yPos}" x2="${displayWidth}" y2="${yPos}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${horizontalStrokeDash} />`;
+        }
+        if (!svgContent.includes(`y1="${displayHeight}"`)) {
+            svgContent += `<line x1="0" y1="${displayHeight}" x2="${displayWidth}" y2="${displayHeight}" stroke="#2980b9" stroke-width="1.2" opacity="0.85"${horizontalStrokeDash} />`;
+        }
+        
+        // 外枠
+        svgContent += `<rect x="0" y="0" width="${displayWidth}" height="${displayHeight}" fill="none" stroke="#2980b9" stroke-width="1.5" />`;
 
-        switches.forEach((sw, idx) => {
-            sw.state = originalStates[idx];
-            const label = document.getElementById(`label_${sw.id}`);
-            if (label) label.textContent = sw.state ? 'ON' : 'OFF';
-        });
-        updateLogic();
+        gridOverlay.innerHTML = svgContent;
 
-        document.getElementById('truthTableModal').style.display = 'flex';
+        // テキスト更新（表示上の縦横サイズは「縦×横」の順で表記）
+        step1.innerHTML = `1. <b>インチ換算（1インチ = 2.5cm）</b>：<br>` +
+            `縦 ${hCm}cm ÷ 2.5 ＝ <span class="highlight">${hInch.toFixed(2)} インチ</span> ｜ ` +
+            `横 ${wCm}cm ÷ 2.5 ＝ <span class="highlight">${wInch.toFixed(2)} インチ</span>`;
+
+        step2.innerHTML = `2. <b>総ピクセル数（画素数）</b>：<br>` +
+            `縦 ${hInch.toFixed(2)}インチ × ${dpi}dpi ＝ ${hPx} px ｜ ` +
+            `横 ${wInch.toFixed(2)}インチ × ${dpi}dpi ＝ ${wPx} px<br>` +
+            `総ピクセル数：<span class="highlight">${totalPixels.toLocaleString()} 画素</span>`;
+
+        step3.innerHTML = `3. <b>解像度（縦×横）</b>：<br>` +
+            `<span class="highlight" style="font-size: 18px;">${hPx} px × ${wPx} px</span>`;
+        
+        canvasNote.innerHTML = `※外枠の物理サイズ（<b>縦 ${hCm}cm × 横 ${wCm}cm</b>）は一定のまま、<b>${dpi} dpi</b>に設定されています。<br>` +
+            `<span style="color: #2563eb; font-weight: bold;">横が2.5cmの倍数の時＝縦線が実線</span>、<span style="color: #2563eb; font-weight: bold;">縦が2.5cmの倍数の時＝横線が実線</span>（それ以外は破線）で表示されます！`;
     }
 
-    function closeModal() {
-        document.getElementById('truthTableModal').style.display = 'none';
-    }
-  </script>
+    widthCmInput.addEventListener('input', updateVisualization);
+    heightCmInput.addEventListener('input', updateVisualization);
+    dpiInput.addEventListener('input', updateVisualization);
+
+    // 初期実行
+    updateVisualization();
+</script>
+
 </body>
 </html>
