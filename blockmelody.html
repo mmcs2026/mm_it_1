@@ -33,7 +33,6 @@
     .btn { padding: 8px 14px; font-size: 13px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; transition: opacity 0.2s; }
     .btn:hover { opacity: 0.85; }
     
-    .btn-flash { background-color: #9c27b0; box-shadow: 0 0 8px rgba(156, 39, 176, 0.4); }
     .btn-sw { background-color: #ff9800; }
     .btn-stop { background-color: #dc3545; }
     .btn-dl { background-color: #007bff; }
@@ -86,8 +85,6 @@
       </div>
 
       <div class="btn-group">
-        <button class="btn btn-flash" onclick="uploadToAttiny()">⚡ ATtiny402へ直接書き込む</button>
-        <span style="color:#cbd5e0;">|</span>
         <button class="btn btn-sw" onclick="pressSwitch(1)">🔘 1回押しテスト</button>
         <button class="btn btn-sw" onclick="pressSwitch(2)">🔘 2回押しテスト</button>
         <button class="btn btn-sw" onclick="pressSwitch(3)">🔘 3回押しテスト</button>
@@ -101,7 +98,7 @@
         <button class="btn btn-dl" onclick="downloadIno()">.ino保存</button>
         <input type="file" id="fileInput" style="display:none;" accept=".json" onchange="loadProject(event)">
 
-        <div id="statusBox">Ready (Web Serial API 待機中)</div>
+        <div id="statusBox">Ready</div>
       </div>
 
       <div id="blocklyDiv"></div>
@@ -394,7 +391,7 @@ void setLED(int m){ digitalWrite(LED1_PIN, (m==1||m==3)?HIGH:LOW); digitalWrite(
 ISR(TCB0_INT_vect){ int8_t o1=0, o2=0; if(target1>0){ phase1++; if(phase1>=target1){ phase1=0; toggle1=!toggle1; } o1=toggle1?1:-1; } if(target2>0){ phase2++; if(phase2>=target2){ phase2=0; toggle2=!toggle2; } o2=toggle2?1:-1; } int8_t sum=o1+o2; if(sum>0){ VPORTA.OUT|=1<<6; VPORTA.OUT&=~(1<<7); } else if(sum<0){ VPORTA.OUT&=~(1<<6); VPORTA.OUT|=1<<7; } else { VPORTA.OUT&=~(1<<6); VPORTA.OUT&=~(1<<7); } TCB0.INTFLAGS=TCB_CAPT_bm; }
 ISR(PORTA_PORT_vect){ PORTA.INTFLAGS=PORT_INT1_bm; }
 void initTimerB(){ TCB0.CCMP=84; TCB0.CTRLA=TCB_CLKSEL_CLKDIV1_gc|TCB_ENABLE_bm; TCB0.INTCTRL=TCB_CAPT_bm; }
-void stopTimerB(){ TCB0.CTRLA&=~TCB_ENABLE_bm; TCB0.INTCTRL&=~TCB_CAPT_bm; digitalWrite(PIEZO_P,LOW); digitalWrite(PIEZO_N,LOW); setLED(LED_OFF); }
+void stopTimerB(){ TCB0.CTRLA&=~TCB_ENABLE_bm; TCB0.INTCTRL&=~TCB_INTCTRL_CAPT_bm; digitalWrite(PIEZO_P,LOW); digitalWrite(PIEZO_N,LOW); setLED(LED_OFF); }
 void setChords(unsigned int f1, unsigned int f2){ target1=(f1>0)?(40000UL/f1/2):0; target2=(f2>0)?(40000UL/f2/2):0; phase1=0; phase2=0; }
 bool checkStopButton(){ if(digitalRead(SW_PIN)==LOW){ delay(20); if(digitalRead(SW_PIN)==LOW){ while(digitalRead(SW_PIN)==LOW); delay(20); return true; } } return false; }
 
@@ -466,66 +463,6 @@ void loop(){
       const box = document.getElementById('statusBox');
       box.textContent = msg;
       box.className = type ? `status-${type}` : '';
-    }
-
-    async function uploadToAttiny() {
-      if (!('serial' in navigator)) {
-        alert('お使いのブラウザはWeb Serial APIに対応していません。Google ChromeまたはMicrosoft Edgeをご使用ください。');
-        return;
-      }
-
-      const code = document.getElementById('codeArea').value;
-      setStatus('1/3 コンパイル中...', 'busy');
-
-      try {
-        const compileRes = await fetch('https://builder.wokwi.com/api/v1/build', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sketch: code,
-            board: 'attiny402',
-            fqbn: 'megaTinyCore:avr:at402'
-          })
-        }).catch(() => null);
-
-        let hexString = "";
-        if (compileRes && compileRes.ok) {
-          const json = await compileRes.json();
-          hexString = json.hex;
-        } else {
-          hexString = ":100000000C9440000C945D000C945D000C945D00CA\n:00000001FF"; 
-        }
-
-        setStatus('2/3 USBポートの選択中...', 'busy');
-
-        const port = await navigator.serial.requestPort();
-        await port.open({ baudRate: 115200 });
-
-        setStatus('3/3 ATtiny402へ書き込み中...', 'busy');
-
-        const writer = port.writable.getWriter();
-        const reader = port.readable.getReader();
-
-        await writer.write(new Uint8Array([0x00])); 
-        await new Promise(r => setTimeout(r, 100));
-
-        await writer.write(new Uint8Array([0x55, 0xE0])); 
-
-        const encoder = new TextEncoder();
-        await writer.write(encoder.encode(hexString));
-
-        writer.releaseLock();
-        reader.releaseLock();
-        await port.close();
-
-        setStatus('⚡ 書き込み完了！', 'ok');
-        alert('ATtiny402 へのプログラム書き込みが正常に完了しました！');
-
-      } catch (err) {
-        console.error(err);
-        setStatus('エラーが発生しました', 'err');
-        alert('書き込みに失敗しました:\n' + err.message);
-      }
     }
 
     function saveProject() {
