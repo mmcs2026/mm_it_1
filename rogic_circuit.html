@@ -52,6 +52,9 @@
 
     .sw-btn { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; padding: 2px 8px; background: #d69e2e; color: #ffffff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     
+    /* ノード内のカスタムテキストラベル (スイッチAやLED1など) */
+    .node-title-label { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: bold; color: #2d3748; white-space: nowrap; pointer-events: none; background: rgba(255,255,255,0.85); padding: 0 3px; border-radius: 3px; }
+
     #wireLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
     .wire-path { stroke: #a0aec0; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; cursor: pointer; pointer-events: stroke; transition: stroke 0.1s; }
     .wire-path:hover { stroke: #e53e3e !important; stroke-width: 5; }
@@ -74,11 +77,8 @@
 </head>
 <body>
 
-<!-- 左側サイドタブメニュー（共通化） -->
-  <script src="sidebar.js"></script>
-
   <!-- メインコンテンツ -->
-  <div class="main-content">
+  <div class="main-content" style="width: 100%;">
     <h1>
       <span>⚡ 論理回路シミュレーター</span>
       <span class="header-desc">💡 「階段スイッチ回路を作る」を押すと作例が自動生成されます</span>
@@ -149,7 +149,7 @@
                 </svg>
             `;
             pinsHTML += `<div class="pin out-pin" data-node="${id}" data-pin="out" style="left:80px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML + `<button class="sw-btn" onclick="toggleSwitch('${id}')">切替</button>`;
+            nodeEl.innerHTML = `<div class="node-title-label" id="title_label_${id}">スイッチ</div>` + svgContent + pinsHTML + `<button class="sw-btn" onclick="toggleSwitch('${id}')">切替</button>`;
         } 
         else if (type === 'NOT') {
             svgContent = `
@@ -200,7 +200,7 @@
                 </svg>
             `;
             pinsHTML += `<div class="pin in-pin" data-node="${id}" data-pin="in1" style="left:10px; top:30px;"></div>`;
-            nodeEl.innerHTML = svgContent + pinsHTML;
+            nodeEl.innerHTML = `<div class="node-title-label" id="title_label_${id}">LED</div>` + svgContent + pinsHTML;
         }
 
         nodeEl.innerHTML += `<button class="del-btn" onclick="removeNode('${id}')">✕</button>`;
@@ -209,25 +209,72 @@
         
         const nodeObj = { id, type, state: false, inputs: { in1: false, in2: false } };
         nodes.push(nodeObj);
+        
+        // 追加時にラベル表示を更新する
+        updateNodeLabels();
         setupPinEvents();
         updateLogic();
         return nodeObj;
     }
 
+    // スイッチやLEDの並び順（X座標優先、次にY座標）に応じて「スイッチA」「スイッチB」「LED 1」などのラベルを自動付与する
+    function getSortedSwitches() {
+        const sws = nodes.filter(n => n.type === 'SWITCH');
+        return sws.sort((a, b) => {
+            const elA = document.getElementById(a.id);
+            const elB = document.getElementById(b.id);
+            const ax = elA ? parseInt(elA.style.left) : 0;
+            const bx = elB ? parseInt(elB.style.left) : 0;
+            if (Math.abs(ax - bx) > 30) return ax - bx;
+            const ay = elA ? parseInt(elA.style.top) : 0;
+            const by = elB ? parseInt(elB.style.top) : 0;
+            return ay - by;
+        });
+    }
+
+    function getSortedLEDs() {
+        const leds = nodes.filter(n => n.type === 'LED');
+        return leds.sort((a, b) => {
+            const elA = document.getElementById(a.id);
+            const elB = document.getElementById(b.id);
+            const ax = elA ? parseInt(elA.style.left) : 0;
+            const bx = elB ? parseInt(elB.style.left) : 0;
+            if (Math.abs(ax - bx) > 30) return ax - bx;
+            const ay = elA ? parseInt(elA.style.top) : 0;
+            const by = elB ? parseInt(elB.style.top) : 0;
+            return ay - by;
+        });
+    }
+
+    function updateNodeLabels() {
+        const switches = getSortedSwitches();
+        switches.forEach((sw, idx) => {
+            const labelEl = document.getElementById(`title_label_${sw.id}`);
+            if (labelEl) {
+                const char = String.fromCharCode(65 + idx); // A, B, C...
+                labelEl.textContent = `スイッチ ${char}`;
+            }
+        });
+
+        const leds = getSortedLEDs();
+        leds.forEach((led, idx) => {
+            const labelEl = document.getElementById(`title_label_${led.id}`);
+            if (labelEl) {
+                labelEl.textContent = `LED ${idx + 1}`;
+            }
+        });
+    }
+
     function buildXORPreset() {
-        // --- パスワード認証の追加 ---
         const password = prompt("完成品サンプルを表示するにはパスワードを入力してください：");
-        
-        // ※ ここでパスワードを設定しています（必要に応じて変更してください）
         const correctPassword = "admin123"; 
 
         if (password !== correctPassword) {
-            if (password !== null) { // キャンセルボタンが押された場合以外
+            if (password !== null) {
                 alert("パスワードが違います！");
             }
-            return; // 処理を中断してサンプルを表示しない
+            return;
         }
-        // -------------------------
 
         clearAll();
         
@@ -269,6 +316,7 @@
         nodes = nodes.filter(n => n.id !== id);
         const el = document.getElementById(id);
         if (el) el.remove();
+        updateNodeLabels();
         updateLogic();
     }
 
@@ -310,6 +358,8 @@
         function closeDragElement() {
             document.onmouseup = null;
             document.onmousemove = null;
+            // ドラッグ完了時に配置順に応じた名前（スイッチA/Bなど）を再計算してリンクさせる
+            updateNodeLabels();
         }
     }
 
@@ -430,8 +480,8 @@
     }
 
     function generateTruthTable() {
-        const switches = nodes.filter(n => n.type === 'SWITCH');
-        const leds = nodes.filter(n => n.type === 'LED');
+        const switches = getSortedSwitches();
+        const leds = getSortedLEDs();
         const container = document.getElementById('truthTableContainer');
 
         if (switches.length === 0 || leds.length === 0) {
@@ -445,7 +495,8 @@
         let tableHTML = '<table class="truth-table"><thead><tr>';
 
         switches.forEach((sw, idx) => {
-            tableHTML += `<th>スイッチ ${String.fromCharCode(65 + idx)}</th>`;
+            const char = String.fromCharCode(65 + idx);
+            tableHTML += `<th>スイッチ ${char}</th>`;
         });
         leds.forEach((led, idx) => {
             tableHTML += `<th class="out-header">LED ${idx + 1}</th>`;
